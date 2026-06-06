@@ -89,14 +89,7 @@ namespace PrometheOSPacker
 
             var modchips = new string[]
             {
-                "Aladdin1mb",
-                "Aladdin2mb",
                 "Xenium",
-                "Xecuter",
-                "Xchanger",
-                "Aladdin1mb",
-                "Aladdin2mb",
-                "Modxo",
             };
 
             foreach (var modchip in modchips)
