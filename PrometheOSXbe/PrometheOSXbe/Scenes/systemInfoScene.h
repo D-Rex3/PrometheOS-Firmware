@@ -20,7 +20,13 @@ public:
 	void update();
 	void render();
 private:
+	struct partitionInfo {
+		char label[20];
+		uint64_t total;
+		uint64_t used;
+	};
 	int mSelectedControl;
 	systemInfoCategoryEnum mSystemInfoCategory;
 	pointerVector<char*>* mInfoItems;
+	pointerVector<partitionInfo*>* mPartitions;
 };

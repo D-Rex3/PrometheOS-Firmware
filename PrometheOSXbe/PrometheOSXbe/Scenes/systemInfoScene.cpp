@@ -16,12 +16,29 @@
 #include "..\stringUtility.h"
 #include "..\xboxConfig.h"
 #include "..\theme.h"
+#include "..\driveManager.h"
+
+namespace
+{
+	char* formatStorageSize(uint64_t bytes)
+	{
+		const uint64_t GB = 1024ULL * 1024ULL * 1024ULL;
+		const uint64_t MB = 1024ULL * 1024ULL;
+		if (bytes >= GB) {
+			return stringUtility::formatString("%.1fGB", (float)bytes / (float)GB);
+		} else if (bytes >= MB) {
+			return stringUtility::formatString("%uMB", (uint32_t)(bytes / MB));
+		}
+		return stringUtility::formatString("%uKB", (uint32_t)(bytes / 1024));
+	}
+}
 
 systemInfoScene::systemInfoScene(systemInfoCategoryEnum systemInfoCategory)
 {
 	mSelectedControl = 0;
 	mInfoItems = new pointerVector<char*>(false);
 	mSystemInfoCategory = systemInfoCategory;
+	mPartitions = NULL;
 	
 	if (mSystemInfoCategory == systemInfoCategoryConsole)
 	{
@@ -63,7 +80,34 @@ systemInfoScene::systemInfoScene(systemInfoCategoryEnum systemInfoCategory)
 		mInfoItems->add(diskSerialNumber);
 		free(diskSerialNumberString);
 
-				// hdd model dvd model
+		mPartitions = new pointerVector<partitionInfo*>(true);
+
+		static const char* mountPoints[] = {
+			"HDD0-C", "HDD0-E", "HDD0-F", "HDD0-G", "HDD0-H", "HDD0-I",
+			"HDD0-J", "HDD0-K", "HDD0-L", "HDD0-M", "HDD0-N",
+			"HDD0-X", "HDD0-Y", "HDD0-Z"
+		};
+		static const char* partitionLabels[] = {
+			"Drive C", "Drive E", "Drive F", "Drive G", "Drive H", "Drive I",
+			"Drive J", "Drive K", "Drive L", "Drive M", "Drive N",
+			"Drive X", "Drive Y", "Drive Z"
+		};
+
+		for (int pi = 0; pi < 14; pi++)
+		{
+			uint64_t total = 0;
+			if (driveManager::getTotalNumberOfBytes(mountPoints[pi], total) && total > 0)
+			{
+				uint64_t freeBytes = 0;
+				driveManager::getTotalFreeNumberOfBytes(mountPoints[pi], freeBytes);
+				partitionInfo* info = new partitionInfo();
+				strncpy(info->label, partitionLabels[pi], sizeof(info->label) - 1);
+				info->label[sizeof(info->label) - 1] = '\0';
+				info->total = total;
+				info->used = total - freeBytes;
+				mPartitions->add(info);
+			}
+		}
 	}
 	else if (mSystemInfoCategory == systemInfoCategoryAudio)
 	{
@@ -144,6 +188,10 @@ systemInfoScene::systemInfoScene(systemInfoCategoryEnum systemInfoCategory)
 systemInfoScene::~systemInfoScene()
 {
 	delete(mInfoItems);
+	if (mPartitions != NULL)
+	{
+		delete(mPartitions);
+	}
 }
 
 void systemInfoScene::update()
@@ -160,9 +208,10 @@ void systemInfoScene::update()
 
 	if (inputManager::buttonPressed(ButtonDpadDown))
 	{
-		if (mInfoItems != NULL)
+		int32_t navCount = (mPartitions != NULL) ? (int32_t)mPartitions->count() : (mInfoItems != NULL ? (int32_t)mInfoItems->count() : 0);
+		if (navCount > 0)
 		{
-			mSelectedControl = mSelectedControl < (int)(mInfoItems->count() - 1) ? mSelectedControl + 1 : 0;
+			mSelectedControl = mSelectedControl < (navCount - 1) ? mSelectedControl + 1 : 0;
 		}
 	}
 
@@ -170,9 +219,10 @@ void systemInfoScene::update()
 
 	if (inputManager::buttonPressed(ButtonDpadUp))
 	{
-		if (mInfoItems != NULL)
+		int32_t navCount = (mPartitions != NULL) ? (int32_t)mPartitions->count() : (mInfoItems != NULL ? (int32_t)mInfoItems->count() : 0);
+		if (navCount > 0)
 		{
-			mSelectedControl = mSelectedControl > 0 ? mSelectedControl - 1 : (int)(mInfoItems->count() - 1); 
+			mSelectedControl = mSelectedControl > 0 ? mSelectedControl - 1 : (navCount - 1);
 		}
 	}
 }
@@ -200,6 +250,66 @@ void systemInfoScene::render()
 	else if (mSystemInfoCategory == systemInfoCategoryAbout)
 	{
 		drawing::drawBitmapStringAligned(context::getBitmapFontMedium(), "System Info: About", theme::getHeaderTextColor(), theme::getHeaderAlign(), 40, theme::getHeaderY(), 640);
+	}
+
+	if (mSystemInfoCategory == systemInfoCategoryStorage && mPartitions != NULL)
+	{
+		uint32_t yPos = 80;
+
+		for (uint32_t i = 0; i < mInfoItems->count(); i++)
+		{
+			component::textBox(mInfoItems->get(i), false, false, horizAlignmentCenter, 40, yPos, 640, 28);
+			yPos += 34;
+		}
+
+		yPos += 8;
+
+		int32_t maxPartitions = 6;
+		int32_t partCount = (int32_t)mPartitions->count();
+		int32_t startPart = 0;
+		if (partCount > maxPartitions)
+		{
+			startPart = min(max(mSelectedControl - (maxPartitions / 2), 0), partCount - maxPartitions);
+		}
+		int32_t visibleCount = min(startPart + maxPartitions, partCount) - startPart;
+
+		for (int32_t i = 0; i < visibleCount; i++)
+		{
+			partitionInfo* info = mPartitions->get(startPart + i);
+			bool selected = (mSelectedControl == startPart + i);
+
+			char* usedStr = formatStorageSize(info->used);
+			char* totalStr = formatStorageSize(info->total);
+			uint32_t pct = (uint32_t)((info->used * 100ULL) / info->total);
+			char* rowLabel = stringUtility::formatString("%s  %s / %s (%u%%)", info->label, usedStr, totalStr, pct);
+			free(usedStr);
+			free(totalStr);
+
+			component::textBox(rowLabel, selected, false, horizAlignmentLeft, 40, yPos, 640, 22);
+			free(rowLabel);
+
+			int barX = 56;
+			int barWidth = 608;
+			int barY = (int)yPos + 24;
+			int barH = 8;
+
+			drawing::drawHorizontalLine(0xff374956, barX, barY, barWidth, barH);
+
+			int fillWidth = (int)((uint64_t)info->used * (uint64_t)barWidth / info->total);
+			if (fillWidth > barWidth) fillWidth = barWidth;
+			if (fillWidth > 0)
+			{
+				uint32_t fillColor = 0xff19b3e6;
+				if (pct >= 95) fillColor = 0xffd40c00;
+				else if (pct >= 80) fillColor = 0xffffcd00;
+				drawing::drawHorizontalLine(fillColor, barX, barY, fillWidth, barH);
+			}
+
+			yPos += 40;
+		}
+
+		drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), "\xC2\xA2 Back", theme::getFooterTextColor(), horizAlignmentRight, 40, theme::getFooterY(), 640);
+		return;
 	}
 
 	uint32_t yPos = 96;
