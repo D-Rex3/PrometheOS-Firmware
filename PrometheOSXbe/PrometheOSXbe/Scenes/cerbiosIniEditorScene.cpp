@@ -451,6 +451,17 @@ void cerbiosIniEditorScene::update()
 
 	const controlDescriptor* desc = &kControls[mActiveControls[mSelectedControl]];
 
+	// File-picker entry on White button (KIND_PATH only) — independent of value-change buttons
+	if (desc->kind == KIND_PATH && inputManager::buttonPressed(ButtonWhite))
+	{
+		mShowingFilePicker = true;
+		sceneContainer* container = new sceneContainer(sceneItemGenericScene,
+			new filePickerScene(filePickerTypeXbe, true, true),
+			"", this, onPathClosingCallback);
+		sceneManager::pushScene(container);
+		return;
+	}
+
 	bool leftPress = inputManager::buttonPressed(ButtonA) || inputManager::buttonPressed(ButtonTriggerLeft);
 	bool rightPress = inputManager::buttonPressed(ButtonTriggerRight);
 
@@ -554,16 +565,6 @@ void cerbiosIniEditorScene::update()
 			mAdvancedUnlocked = !mAdvancedUnlocked;
 			rebuildActiveControls();
 		} break;
-	}
-
-	// File-picker entry on White button (KIND_PATH only)
-	if (desc->kind == KIND_PATH && inputManager::buttonPressed(ButtonWhite))
-	{
-		mShowingFilePicker = true;
-		sceneContainer* container = new sceneContainer(sceneItemGenericScene,
-			new filePickerScene(filePickerTypeXbe, true, true),
-			"", this, onPathClosingCallback);
-		sceneManager::pushScene(container);
 	}
 }
 
