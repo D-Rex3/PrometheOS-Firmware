@@ -930,10 +930,10 @@ static void setConfigDefaultLegacy(cerbiosConfig* config)
 	strcpy(config->CdPath1, "");
 	strcpy(config->CdPath2, "");
 	strcpy(config->CdPath3, "");
-	strcpy(config->DashPath1, "\\Device\\Harddisk0\\Partition2\\evoxdash.xbe");
-	strcpy(config->DashPath2, "\\Device\\Harddisk0\\Partition2\\avalaunch.xbe");
-	strcpy(config->DashPath3, "\\Device\\Harddisk0\\Partition2\\nexgen.xbe");
-	strcpy(config->BootAnimPath, "\\Device\\Harddisk0\\Partition2\\BootAnims\\Xbox\\bootanim.xbe");
+	strcpy(config->DashPath1, "C:\\evoxdash.xbe");
+	strcpy(config->DashPath2, "C:\\avalaunch.xbe");
+	strcpy(config->DashPath3, "C:\\nexgen.xbe");
+	strcpy(config->BootAnimPath, "C:\\BootAnims\\Xbox\\bootanim.xbe");
 	strcpy(config->FrontLed, "GGGG");
 	config->FanSpeed = 0;
 	config->UdmaModeMaster = 2;
