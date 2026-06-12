@@ -152,7 +152,7 @@ static const controlDescriptor kControls[] = {
 	{ CID_IGRCycle,          VC, false, "IGR Cycle:",           KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRCycle) },
 	{ CID_IGRShutdown,       VC, false, "IGR Shutdown:",        KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRShutdown) },
 	{ CID_IGRScreen,         VC, false, "IGR Screenshot:",      KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRScreen) },
-	{ CID_AdvUnlock,         VC, false, "Unlock Advanced (OC):",KIND_ADV_UNLOCK,  0 },
+	{ CID_AdvUnlock,         VC, false, "Unlock Advanced:",     KIND_ADV_UNLOCK,  0 },
 	{ CID_Overclocking,      VC, true,  "Overclocking:",        KIND_BOOL,        offsetof(cerbiosConfig, Overclocking) },
 	{ CID_CPUMPLLCoeff,      VC, true,  "CPU Overclock:",       KIND_HEX24,       offsetof(cerbiosConfig, CPUMPLLCoeff) },
 	{ CID_NVPLLCoeff,        VC, true,  "GPU Overclock:",       KIND_HEX24,       offsetof(cerbiosConfig, NVPLLCoeff) },
