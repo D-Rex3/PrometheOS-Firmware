@@ -226,8 +226,8 @@ utils::dataContainer* onGetCallback(const char* path, const char* query)
 	else if (stringUtility::equals(path, "\\api\\cerbiosini", true))
 	{
 		char* temp = (char*)malloc(65536);
-		cerbiosConfig config = cerbiosIniHelper::loadConfig("HDD0-C:\\cerbios.ini");
-		cerbiosIniHelper::buildConfig(&config, temp);
+		cerbiosConfig config = cerbiosIniHelper::loadConfig("HDD0-C:\\cerbios.ini", CerbiosVersionLegacy);
+		cerbiosIniHelper::buildConfig(&config, CerbiosVersionLegacy, temp);
 		body = new utils::dataContainer(temp, strlen(temp), strlen(temp));
 	}
 	else if (stringUtility::equals(path, "\\api\\screenshot", true))

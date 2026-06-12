@@ -345,12 +345,12 @@ void sceneManager::pushScene(sceneItemEnum sceneItem)
 	}
 	else if (sceneItem == sceneItemCerbiosIniEditorSceneCurrent)
 	{
-		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene("HDD0-E:\\Cerbios\\cerbios.ini"), "Cerbios INI Editor (3.0.0+)");
+		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene("HDD0-E:\\Cerbios\\cerbios.ini", CerbiosVersionCurrent), "Cerbios INI Editor (3.0.0+)");
 		addScene(container);
 	}
 	else if (sceneItem == sceneItemCerbiosIniEditorSceneLegacy)
 	{
-		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene("HDD0-C:\\cerbios.ini"), "Cerbios INI Editor (2.4.2 and below)");
+		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene("HDD0-C:\\cerbios.ini", CerbiosVersionLegacy), "Cerbios INI Editor (2.4.2 and below)");
 		addScene(container);
 	}
 	else if (sceneItem == sceneItemFormatDrivePrimaryScene)
