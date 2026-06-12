@@ -159,6 +159,70 @@ static uint32_t* u32Ptr(cerbiosConfig* cfg, size_t off) { return (uint32_t*)((ch
 static char* charPtr(cerbiosConfig* cfg, size_t off) { return (char*)((char*)cfg + off); }
 
 // ============================================================================
+// File-picker path conversion
+// ============================================================================
+// filePickerScene returns raw kernel device paths like
+//   \Device\Harddisk0\Partition1\Apps\Dashloader\evoxdash.xbe
+// Cerbios INI expects drive-letter form:
+//   3.0.0+ : HDD0-E:\Apps\Dashloader\evoxdash.xbe   (HDD prefix for dual-HDD setups)
+//   2.4.2  : E:\Apps\Dashloader\evoxdash.xbe
+// Partition map (Xbox kernel): 1=E 2=C 3=X 4=Y 5=Z 6=F 7=G. Returns false if the
+// input doesn't match the device-path pattern so the original text is preserved.
+
+static bool convertDevicePathToDrive(const char* devPath, cerbiosVersion version, char* outBuf)
+{
+	const char* devicePrefix = "\\Device\\Harddisk";
+	size_t prefixLen = strlen(devicePrefix);
+	if (strncmp(devPath, devicePrefix, prefixLen) != 0) return false;
+
+	const char* p = devPath + prefixLen;
+	int hddNum = 0;
+	if (*p < '0' || *p > '9') return false;
+	while (*p >= '0' && *p <= '9')
+	{
+		hddNum = hddNum * 10 + (*p - '0');
+		p++;
+	}
+
+	const char* partPrefix = "\\Partition";
+	size_t partPrefixLen = strlen(partPrefix);
+	if (strncmp(p, partPrefix, partPrefixLen) != 0) return false;
+	p += partPrefixLen;
+
+	int partNum = 0;
+	if (*p < '0' || *p > '9') return false;
+	while (*p >= '0' && *p <= '9')
+	{
+		partNum = partNum * 10 + (*p - '0');
+		p++;
+	}
+
+	char drive;
+	switch (partNum)
+	{
+		case 1: drive = 'E'; break;
+		case 2: drive = 'C'; break;
+		case 3: drive = 'X'; break;
+		case 4: drive = 'Y'; break;
+		case 5: drive = 'Z'; break;
+		case 6: drive = 'F'; break;
+		case 7: drive = 'G'; break;
+		default: return false;
+	}
+
+	// p now points at the rest of the path (e.g. "\Apps\Dashloader\evox.xbe") or end.
+	if (version == CerbiosVersionCurrent)
+	{
+		sprintf(outBuf, "HDD%d-%c:%s", hddNum, drive, p);
+	}
+	else
+	{
+		sprintf(outBuf, "%c:%s", drive, p);
+	}
+	return true;
+}
+
+// ============================================================================
 // Callbacks
 // ============================================================================
 
@@ -176,7 +240,15 @@ void cerbiosIniEditorScene::onPathClosingCallback(sceneResult result, void* cont
 			if (desc != NULL)
 			{
 				char* dest = charPtr(&self->mConfig, desc->offset);
-				strncpy(dest, path, 99);
+				char converted[256];
+				if (convertDevicePathToDrive(path, self->mVersion, converted))
+				{
+					strncpy(dest, converted, 99);
+				}
+				else
+				{
+					strncpy(dest, path, 99);
+				}
 				dest[99] = 0;
 				self->refreshShortPath(controlId);
 				self->mNeedsSave = true;
