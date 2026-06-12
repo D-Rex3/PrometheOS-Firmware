@@ -226,7 +226,7 @@ utils::dataContainer* onGetCallback(const char* path, const char* query)
 	else if (stringUtility::equals(path, "\\api\\cerbiosini", true))
 	{
 		char* temp = (char*)malloc(65536);
-		cerbiosConfig config = cerbiosIniHelper::loadConfig();
+		cerbiosConfig config = cerbiosIniHelper::loadConfig("HDD0-C:\\cerbios.ini");
 		cerbiosIniHelper::buildConfig(&config, temp);
 		body = new utils::dataContainer(temp, strlen(temp), strlen(temp));
 	}
@@ -349,7 +349,7 @@ utils::dataContainer* onPostCallback(const char* path, const char* query, pointe
 
 		FormPart* bodyPart = formParts->get(0);
 		char* body = (char*)bodyPart->body->data;
-		cerbiosIniHelper::saveConfig(body);
+		cerbiosIniHelper::saveConfig("HDD0-C:\\cerbios.ini", body);
 	}
 
 	return httpServer::generateResponse(404, "Mot found");

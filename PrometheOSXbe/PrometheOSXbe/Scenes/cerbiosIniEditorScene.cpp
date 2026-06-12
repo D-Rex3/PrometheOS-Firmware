@@ -104,9 +104,10 @@ void cerbiosIniEditorScene::onFrontLedClosingCallback(sceneResult result, void* 
 	free(ledSequence);
 }
 
-cerbiosIniEditorScene::cerbiosIniEditorScene()
+cerbiosIniEditorScene::cerbiosIniEditorScene(const char* iniPath)
 {
-	mConfig = cerbiosIniHelper::loadConfig();
+	mIniPath = strdup(iniPath);
+	mConfig = cerbiosIniHelper::loadConfig(mIniPath);
 	mConfig.FanSpeed = mConfig.FanSpeed;
 	mShortCdPath1 = shortenString(mConfig.CdPath1);
 	mShortCdPath2 = shortenString(mConfig.CdPath2);
@@ -125,6 +126,7 @@ cerbiosIniEditorScene::cerbiosIniEditorScene()
 
 cerbiosIniEditorScene::~cerbiosIniEditorScene()
 {
+	free(mIniPath);
 	free(mShortCdPath1);
 	free(mShortCdPath2);
 	free(mShortCdPath3);
@@ -170,7 +172,7 @@ void cerbiosIniEditorScene::update()
 	{
 		char* buffer = (char*)malloc(65536);
 		cerbiosIniHelper::buildConfig(&mConfig, buffer);
-		cerbiosIniHelper::saveConfig(buffer);
+		cerbiosIniHelper::saveConfig(mIniPath, buffer);
 		free(buffer);
 		mNeedsSave = false;
 	}

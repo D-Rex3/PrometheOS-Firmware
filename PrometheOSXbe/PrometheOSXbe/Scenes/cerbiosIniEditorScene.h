@@ -8,12 +8,13 @@
 class cerbiosIniEditorScene : public scene
 {
 public:
-	cerbiosIniEditorScene();
+	cerbiosIniEditorScene(const char* iniPath);
 	~cerbiosIniEditorScene();
 	void update();
 	void render();
 	char* shortenString(const char* value);
 private:
+	char* mIniPath;
 	int mSelectedControl;
 	int mMaxOptionCount;
 	bool mNeedsSave;

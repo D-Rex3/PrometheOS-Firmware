@@ -216,7 +216,7 @@ void cerbiosIniHelper::parseConfig(cerbiosConfig* config, utils::dataContainer* 
     free(lineBuffer);
 }
 
-cerbiosConfig cerbiosIniHelper::loadConfig()
+cerbiosConfig cerbiosIniHelper::loadConfig(const char* path)
 {
 	// Init default config
 
@@ -225,7 +225,7 @@ cerbiosConfig cerbiosIniHelper::loadConfig()
 	setConfigDefault(&config);
 
 	uint32_t fileHandle;
-	if (fileSystem::fileOpen("HDD0-C:\\cerbios.ini", fileSystem::FileModeRead, fileHandle))
+	if (fileSystem::fileOpen(path, fileSystem::FileModeRead, fileHandle))
 	{
 		uint32_t fileSize;
 		if (fileSystem::fileSize(fileHandle, fileSize))
@@ -381,13 +381,24 @@ void cerbiosIniHelper::buildConfig(cerbiosConfig* config, char* buffer)
 	strcat(buffer, "\r\n");
 }
 
-void cerbiosIniHelper::saveConfig(char* buffer)
+void cerbiosIniHelper::saveConfig(const char* path, char* buffer)
 {
+	const char* lastSlash = strrchr(path, '\\');
+	if (lastSlash != NULL && lastSlash != path)
+	{
+		uint32_t parentLen = (uint32_t)(lastSlash - path);
+		char* parentPath = (char*)malloc(parentLen + 1);
+		strncpy(parentPath, path, parentLen);
+		parentPath[parentLen] = 0;
+		fileSystem::directoryCreate(parentPath);
+		free(parentPath);
+	}
+
 	uint32_t fileHandle;
-	if (fileSystem::fileOpen("HDD0-C:\\cerbios.ini", fileSystem::FileModeWrite, fileHandle))
+	if (fileSystem::fileOpen(path, fileSystem::FileModeWrite, fileHandle))
 	{
 		uint32_t bytesWritten = 0;
-		fileSystem::fileWrite(fileHandle, buffer, strlen(buffer), bytesWritten); 
+		fileSystem::fileWrite(fileHandle, buffer, strlen(buffer), bytesWritten);
 		fileSystem::fileClose(fileHandle);
 	}
 }

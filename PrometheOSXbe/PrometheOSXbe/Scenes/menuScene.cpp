@@ -237,6 +237,14 @@ void menuScene::render()
 			{
 				menuText = strdup("Cerbios INI Editor");
 			}
+			else if (sceneItem == sceneItemCerbiosIniEditorSceneCurrent)
+			{
+				menuText = strdup("Cerbios INI Editor (3.0.0+)");
+			}
+			else if (sceneItem == sceneItemCerbiosIniEditorSceneLegacy)
+			{
+				menuText = strdup("Cerbios INI Editor (2.4.2 and below)");
+			}
 			else if (sceneItem == sceneItemFormatDriveOptionsScene)
 			{
 				menuText = strdup("Format Drive");

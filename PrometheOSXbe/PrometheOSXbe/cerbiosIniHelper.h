@@ -29,9 +29,9 @@ typedef struct cerbiosConfig
 class cerbiosIniHelper
 {
 public:
-	static cerbiosConfig loadConfig();
+	static cerbiosConfig loadConfig(const char* path);
 	static void buildConfig(cerbiosConfig* config, char* buffer);
-	static void saveConfig(char* buffer);
+	static void saveConfig(const char* path, char* buffer);
 	static void setConfigDefault(cerbiosConfig* config);
 private:
 	static void upperCase(char* value);

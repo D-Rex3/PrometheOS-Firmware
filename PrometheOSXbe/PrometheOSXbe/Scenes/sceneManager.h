@@ -57,6 +57,8 @@ enum sceneItemEnum
 	sceneItemHddPasswordScene,
 	sceneItemGamesScene,
 	sceneItemCerbiosIniEditorScene,
+	sceneItemCerbiosIniEditorSceneCurrent,
+	sceneItemCerbiosIniEditorSceneLegacy,
 	sceneItemFormatDriveOptionsScene,
 	sceneItemFormatDrivePrimaryScene,
 	sceneItemFormatDriveSecondaryScene,

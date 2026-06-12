@@ -337,7 +337,20 @@ void sceneManager::pushScene(sceneItemEnum sceneItem)
 	}
 	else if (sceneItem == sceneItemCerbiosIniEditorScene)
 	{
-		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene(), "Cerbios INI Editor");
+		pointerVector<utils::intContainer*>* sceneItems = new pointerVector<utils::intContainer*>(true);
+		sceneItems->add(new utils::intContainer(sceneItemCerbiosIniEditorSceneCurrent));
+		sceneItems->add(new utils::intContainer(sceneItemCerbiosIniEditorSceneLegacy));
+		sceneContainer* container = new sceneContainer(sceneItem, new menuScene("Select Cerbios INI to edit...", "", sceneItems), "Cerbios INI Editor");
+		addScene(container);
+	}
+	else if (sceneItem == sceneItemCerbiosIniEditorSceneCurrent)
+	{
+		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene("HDD0-E:\\Cerbios\\cerbios.ini"), "Cerbios INI Editor (3.0.0+)");
+		addScene(container);
+	}
+	else if (sceneItem == sceneItemCerbiosIniEditorSceneLegacy)
+	{
+		sceneContainer* container = new sceneContainer(sceneItem, new cerbiosIniEditorScene("HDD0-C:\\cerbios.ini"), "Cerbios INI Editor (2.4.2 and below)");
 		addScene(container);
 	}
 	else if (sceneItem == sceneItemFormatDrivePrimaryScene)
