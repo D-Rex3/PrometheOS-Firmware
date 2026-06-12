@@ -211,7 +211,7 @@ void cerbiosIniEditorScene::onPathClosingCallback(sceneResult result, void* cont
 	if (self->mShowingFilePicker == true)
 	{
 		filePickerScene* closingScene = (filePickerScene*)scene;
-		const char* path = closingScene->getPath();
+		char* path = closingScene->getFilePath();
 		if (path != NULL)
 		{
 			int controlId = kControls[self->mActiveControls[self->mSelectedControl]].id;
