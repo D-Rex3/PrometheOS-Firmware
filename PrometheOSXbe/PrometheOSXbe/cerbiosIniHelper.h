@@ -65,13 +65,39 @@ typedef struct cerbiosConfig
     uint16_t IGRScreen;
 } cerbiosConfig;
 
+// Round-trip preservation: each line of the source INI becomes either a "raw"
+// line (comment / blank / unrecognized key) which is emitted verbatim, or a
+// "mutable" line (recognized key) whose value is re-emitted from the current
+// struct on save. This lets manual PC edits to fields PrometheOS doesn't expose
+// in its TUI editor (e.g. CPUMPLLCoeff) survive round-trip through Save.
+
+#define INI_LINE_RAW      0
+#define INI_LINE_MUTABLE  1
+
+typedef struct cerbiosIniLine
+{
+	int kind;
+	char* raw;       // INI_LINE_RAW: full line text (no trailing CRLF), free()-owned
+	char* origKey;   // INI_LINE_MUTABLE: original-case key as it appeared in the file
+	char* upperKey;  // INI_LINE_MUTABLE: uppercased key, used to look up the format fn
+} cerbiosIniLine;
+
+typedef struct cerbiosIniDoc
+{
+	cerbiosIniLine** lines;
+	int count;
+	int capacity;
+} cerbiosIniDoc;
+
 class cerbiosIniHelper
 {
 public:
-	static cerbiosConfig loadConfig(const char* path, cerbiosVersion version);
-	static void buildConfig(cerbiosConfig* config, cerbiosVersion version, char* buffer);
+	static cerbiosConfig loadConfig(const char* path, cerbiosVersion version, cerbiosIniDoc* outDoc);
+	static void buildConfig(cerbiosConfig* config, cerbiosVersion version, cerbiosIniDoc* doc, char* buffer);
 	static void saveConfig(const char* path, char* buffer);
 	static void setConfigDefault(cerbiosConfig* config, cerbiosVersion version);
+	static void initIniDoc(cerbiosIniDoc* doc);
+	static void freeIniDoc(cerbiosIniDoc* doc);
 private:
 	static void upperCase(char* value);
 	static void trimSpace(char* value);
@@ -79,6 +105,7 @@ private:
 	static uint8_t parseBoolean(char* value, uint8_t defaultValue);
 	static uint32_t parseHex(char* value, uint32_t defaultValue);
 	static uint16_t parseHexU16(char* value, uint16_t defaultValue);
-	static void parseConfigLine(cerbiosConfig* config, char* param1, char* param2, char* buffer, unsigned long bufferSize);
-	static void parseConfig(cerbiosConfig* config, utils::dataContainer* configData);
+	static bool splitKeyValue(char* buffer, unsigned long bufferSize, char* outOrigKey, char* outValue);
+	static bool parseKnownKey(cerbiosConfig* config, const char* upperKey, char* value);
+	static void parseConfig(cerbiosConfig* config, utils::dataContainer* configData, cerbiosIniDoc* outDoc);
 };

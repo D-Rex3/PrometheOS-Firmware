@@ -5,6 +5,10 @@
 #include "utils.h"
 #include "fileSystem.h"
 
+// ============================================================================
+// Tiny string helpers (existing behavior preserved)
+// ============================================================================
+
 void cerbiosIniHelper::upperCase(char* value)
 {
     for (uint32_t i = 0; i < (int)strlen(value); i++)
@@ -93,249 +97,381 @@ uint16_t cerbiosIniHelper::parseHexU16(char* value, uint16_t defaultValue)
     return defaultValue;
 }
 
-void cerbiosIniHelper::parseConfigLine(cerbiosConfig* config, char* param1, char* param2, char* buffer, unsigned long bufferSize)
+// ============================================================================
+// Line parsing: split "key = value" into origKey + value (no trim/uppercase)
+// Returns true if the line is a key=value form. Comments handled by caller.
+// outOrigKey and outValue must each have room for at least 256 chars.
+// ============================================================================
+
+bool cerbiosIniHelper::splitKeyValue(char* buffer, unsigned long bufferSize, char* outOrigKey, char* outValue)
 {
-	char* params[2];
-    params[0] = param1;
-    params[1] = param2;
+    char* parts[2];
+    parts[0] = outOrigKey;
+    parts[1] = outValue;
 
-	uint32_t paramLengths[2];
-    paramLengths[0] = 0;
-    paramLengths[1] = 0;
+    uint32_t lengths[2];
+    lengths[0] = 0;
+    lengths[1] = 0;
 
-    uint32_t paramIndex = 0;
-    for (uint32_t i = 0; i < bufferSize; i++) {
-        char currentChar = buffer[i];
-        if (paramIndex > 1) {
-            return;
-        }
-        else if (currentChar == '=') {
-            params[paramIndex][paramLengths[paramIndex]] = 0;
-            paramIndex++;
+    uint32_t partIdx = 0;
+    for (uint32_t i = 0; i < bufferSize; i++)
+    {
+        char c = buffer[i];
+        if (partIdx > 1) break;
+        if (c == '=')
+        {
+            parts[partIdx][lengths[partIdx]] = 0;
+            partIdx++;
             continue;
         }
-        else if (currentChar == ';') {
-            break;
-        }
-        if (paramLengths[paramIndex] > 255) {
-            continue;
-        }
-        params[paramIndex][paramLengths[paramIndex]] = currentChar;
-        paramLengths[paramIndex] = paramLengths[paramIndex] + 1;
+        if (c == ';') break;
+        if (lengths[partIdx] > 255) continue;
+        parts[partIdx][lengths[partIdx]] = c;
+        lengths[partIdx]++;
     }
-    params[paramIndex][paramLengths[paramIndex]] = 0;
+    parts[partIdx][lengths[partIdx]] = 0;
 
-    if (paramIndex != 1) {
-        return;
-    }
+    if (partIdx != 1) return false;
 
-    trimSpace(params[0]);
-    upperCase(params[0]);
-
-    trimSpace(params[1]);
-
-    // Shared keys (both versions)
-    if (strcmp(params[0], "DRIVESETUP") == 0) {
-        config->DriveSetup = parseByte(params[1], config->DriveSetup);
-        config->DriveSetup  = min(max(config->DriveSetup , 0), 3);
-    }
-    else if (strcmp(params[0], "AVCHECK") == 0) {
-        config->AVCheck = parseBoolean(params[1], config->AVCheck);
-    }
-    else if (strcmp(params[0], "DEBUG") == 0) {
-        config->Debug = parseBoolean(params[1], config->Debug);
-    }
-    else if (strcmp(params[0], "BOOTANIMPATH") == 0) {
-        strncpy(config->BootAnimPath, params[1], 99);
-    }
-    else if (strcmp(params[0], "FRONTLED") == 0 && strlen(params[1]) == 4) {
-        strncpy(config->FrontLed, params[1], 4);
-        upperCase(config->FrontLed);
-    }
-    else if (strcmp(params[0], "FANSPEED") == 0) {
-        config->FanSpeed = parseByte(params[1], config->FanSpeed);
-    }
-    else if (strcmp(params[0], "UDMAMOE") == 0) {
-        config->UdmaModeMaster = parseByte(params[1], config->UdmaModeMaster);
-    }
-    else if (strcmp(params[0], "UDMAMODEMASTER") == 0) {
-        config->UdmaModeMaster = parseByte(params[1], config->UdmaModeMaster);
-    }
-    else if (strcmp(params[0], "UDMAMODESLAVE") == 0) {
-        config->UdmaModeSlave = parseByte(params[1], config->UdmaModeSlave);
-    }
-    else if (strcmp(params[0], "FORCE480P") == 0) {
-        config->Force480p = parseBoolean(params[1], config->Force480p);
-    }
-    else if (strcmp(params[0], "FORCEVGA") == 0) {
-        config->ForceVGA = parseBoolean(params[1], config->ForceVGA);
-    }
-    else if (strcmp(params[0], "RTCENABLE") == 0) {
-        // 2.4.2 spells this "RtcEnable", 3.0.0 uses "RTCEnable" -- both upper-case to RTCENABLE here.
-        config->RtcEnable = parseBoolean(params[1], config->RtcEnable);
-    }
-    else if (strcmp(params[0], "BLOCKDASHUPDATE") == 0) {
-        config->BlockDashUpdate = parseBoolean(params[1], config->BlockDashUpdate);
-    }
-    else if (strcmp(params[0], "RESETONEJECT") == 0) {
-        config->ResetOnEject = parseBoolean(params[1], config->ResetOnEject);
-    }
-    // Legacy (2.4.2) keys
-    else if (strcmp(params[0], "CDPATH1") == 0) {
-        strncpy(config->CdPath1, params[1], 99);
-    }
-    else if (strcmp(params[0], "CDPATH2") == 0) {
-        strncpy(config->CdPath2, params[1], 99);
-    }
-    else if (strcmp(params[0], "CDPATH3") == 0) {
-        strncpy(config->CdPath3, params[1], 99);
-    }
-    else if (strcmp(params[0], "DASHPATH1") == 0) {
-        strncpy(config->DashPath1, params[1], 99);
-    }
-    else if (strcmp(params[0], "DASHPATH2") == 0) {
-        strncpy(config->DashPath2, params[1], 99);
-    }
-    else if (strcmp(params[0], "DASHPATH3") == 0) {
-        strncpy(config->DashPath3, params[1], 99);
-    }
-    // Current (3.0.0+) keys
-    else if (strcmp(params[0], "DASHPATH") == 0) {
-        strncpy(config->DashPath, params[1], 99);
-    }
-    else if (strcmp(params[0], "FORCEFFILTER") == 0) {
-        config->ForceFFilter = parseByte(params[1], config->ForceFFilter);
-        config->ForceFFilter = min(max(config->ForceFFilter, 0), 6);
-    }
-    else if (strcmp(params[0], "OVERRIDEFAN") == 0) {
-        config->OverrideFan = parseBoolean(params[1], config->OverrideFan);
-    }
-    else if (strcmp(params[0], "OVERCLOCKING") == 0) {
-        config->Overclocking = parseBoolean(params[1], config->Overclocking);
-    }
-    else if (strcmp(params[0], "CPUMPLLCOEFF") == 0) {
-        config->CPUMPLLCoeff = parseHex(params[1], config->CPUMPLLCoeff) & 0x00FFFFFF;
-    }
-    else if (strcmp(params[0], "NVPLLCOEFF") == 0) {
-        config->NVPLLCoeff = parseHex(params[1], config->NVPLLCoeff) & 0x00FFFFFF;
-    }
-    else if (strcmp(params[0], "INAPPLCDENABLE") == 0) {
-        config->InAppLCDEnable = parseBoolean(params[1], config->InAppLCDEnable);
-    }
-    else if (strcmp(params[0], "LCDBUS") == 0) {
-        config->LCDBus = parseByte(params[1], config->LCDBus);
-    }
-    else if (strcmp(params[0], "LCDI2CADDR") == 0) {
-        config->LCDI2CAddr = parseByte(params[1], config->LCDI2CAddr);
-    }
-    else if (strcmp(params[0], "LCDPROTO") == 0) {
-        config->LCDProto = parseByte(params[1], config->LCDProto);
-    }
-    else if (strcmp(params[0], "XONLINEDASHREDIR") == 0) {
-        config->XonlineDashRedir = parseBoolean(params[1], config->XonlineDashRedir);
-    }
-    else if (strcmp(params[0], "ADVCPUSUPPORT") == 0) {
-        config->AdvCPUSupport = parseBoolean(params[1], config->AdvCPUSupport);
-    }
-    else if (strcmp(params[0], "DISABLELIMITMEM") == 0) {
-        config->DisableLimitMem = parseBoolean(params[1], config->DisableLimitMem);
-    }
-    else if (strcmp(params[0], "APPLYTITLEPATCHES") == 0) {
-        config->ApplyTitlePatches = parseBoolean(params[1], config->ApplyTitlePatches);
-    }
-    else if (strcmp(params[0], "READONLYC") == 0) {
-        config->ReadOnlyC = parseBoolean(params[1], config->ReadOnlyC);
-    }
-    else if (strcmp(params[0], "TUDATAREDIR") == 0) {
-        config->TUDATARedir = parseBoolean(params[1], config->TUDATARedir);
-    }
-    else if (strcmp(params[0], "TUDATAREDIRHDD") == 0) {
-        config->TUDATARedirHDD = parseByte(params[1], config->TUDATARedirHDD);
-    }
-    else if (strcmp(params[0], "TUDATAREDIRPART") == 0) {
-        config->TUDATARedirPart = parseByte(params[1], config->TUDATARedirPart);
-    }
-    else if (strcmp(params[0], "ENABLESCREENSHOTS") == 0) {
-        config->EnableScreenshots = parseBoolean(params[1], config->EnableScreenshots);
-    }
-    else if (strcmp(params[0], "SCREENSHOTHDD") == 0) {
-        config->ScreenshotHDD = parseByte(params[1], config->ScreenshotHDD);
-    }
-    else if (strcmp(params[0], "SCREENSHOTPART") == 0) {
-        config->ScreenshotPart = parseByte(params[1], config->ScreenshotPart);
-    }
-    else if (strcmp(params[0], "IGRMASTERPORT") == 0) {
-        config->IGRMasterPort = parseByte(params[1], config->IGRMasterPort);
-        config->IGRMasterPort = min(max(config->IGRMasterPort, 0), 4);
-    }
-    else if (strcmp(params[0], "IGRDASH") == 0) {
-        config->IGRDash = parseHexU16(params[1], config->IGRDash);
-    }
-    else if (strcmp(params[0], "IGRGAME") == 0) {
-        config->IGRGame = parseHexU16(params[1], config->IGRGame);
-    }
-    else if (strcmp(params[0], "IGRFULL") == 0) {
-        config->IGRFull = parseHexU16(params[1], config->IGRFull);
-    }
-    else if (strcmp(params[0], "IGRCYCLE") == 0) {
-        config->IGRCycle = parseHexU16(params[1], config->IGRCycle);
-    }
-    else if (strcmp(params[0], "IGRSHUTDOWN") == 0) {
-        config->IGRShutdown = parseHexU16(params[1], config->IGRShutdown);
-    }
-    else if (strcmp(params[0], "IGRSCREEN") == 0) {
-        config->IGRScreen = parseHexU16(params[1], config->IGRScreen);
-    }
+    trimSpace(outOrigKey);
+    trimSpace(outValue);
+    return outOrigKey[0] != 0;
 }
 
-void cerbiosIniHelper::parseConfig(cerbiosConfig* config, utils::dataContainer* configData)
+// ============================================================================
+// parseKnownKey: writes the value into the cerbiosConfig struct if upperKey
+// is one PrometheOS recognizes. Returns true if recognized.
+// ============================================================================
+
+bool cerbiosIniHelper::parseKnownKey(cerbiosConfig* config, const char* upperKey, char* value)
+{
+    // Shared keys (both versions)
+    if (strcmp(upperKey, "DRIVESETUP") == 0) {
+        config->DriveSetup = parseByte(value, config->DriveSetup);
+        config->DriveSetup = min(max(config->DriveSetup, 0), 3);
+        return true;
+    }
+    if (strcmp(upperKey, "AVCHECK") == 0)         { config->AVCheck = parseBoolean(value, config->AVCheck); return true; }
+    if (strcmp(upperKey, "DEBUG") == 0)           { config->Debug = parseBoolean(value, config->Debug); return true; }
+    if (strcmp(upperKey, "BOOTANIMPATH") == 0)    { strncpy(config->BootAnimPath, value, 99); return true; }
+    if (strcmp(upperKey, "FRONTLED") == 0 && strlen(value) == 4) {
+        strncpy(config->FrontLed, value, 4);
+        upperCase(config->FrontLed);
+        return true;
+    }
+    if (strcmp(upperKey, "FANSPEED") == 0)        { config->FanSpeed = parseByte(value, config->FanSpeed); return true; }
+    if (strcmp(upperKey, "UDMAMOE") == 0)         { config->UdmaModeMaster = parseByte(value, config->UdmaModeMaster); return true; }
+    if (strcmp(upperKey, "UDMAMODEMASTER") == 0)  { config->UdmaModeMaster = parseByte(value, config->UdmaModeMaster); return true; }
+    if (strcmp(upperKey, "UDMAMODESLAVE") == 0)   { config->UdmaModeSlave = parseByte(value, config->UdmaModeSlave); return true; }
+    if (strcmp(upperKey, "FORCE480P") == 0)       { config->Force480p = parseBoolean(value, config->Force480p); return true; }
+    if (strcmp(upperKey, "FORCEVGA") == 0)        { config->ForceVGA = parseBoolean(value, config->ForceVGA); return true; }
+    if (strcmp(upperKey, "RTCENABLE") == 0)       { config->RtcEnable = parseBoolean(value, config->RtcEnable); return true; }
+    if (strcmp(upperKey, "BLOCKDASHUPDATE") == 0) { config->BlockDashUpdate = parseBoolean(value, config->BlockDashUpdate); return true; }
+    if (strcmp(upperKey, "RESETONEJECT") == 0)    { config->ResetOnEject = parseBoolean(value, config->ResetOnEject); return true; }
+    // Legacy (2.4.2) keys
+    if (strcmp(upperKey, "CDPATH1") == 0)         { strncpy(config->CdPath1, value, 99); return true; }
+    if (strcmp(upperKey, "CDPATH2") == 0)         { strncpy(config->CdPath2, value, 99); return true; }
+    if (strcmp(upperKey, "CDPATH3") == 0)         { strncpy(config->CdPath3, value, 99); return true; }
+    if (strcmp(upperKey, "DASHPATH1") == 0)       { strncpy(config->DashPath1, value, 99); return true; }
+    if (strcmp(upperKey, "DASHPATH2") == 0)       { strncpy(config->DashPath2, value, 99); return true; }
+    if (strcmp(upperKey, "DASHPATH3") == 0)       { strncpy(config->DashPath3, value, 99); return true; }
+    // Current (3.0.0+) keys
+    if (strcmp(upperKey, "DASHPATH") == 0)        { strncpy(config->DashPath, value, 99); return true; }
+    if (strcmp(upperKey, "FORCEFFILTER") == 0) {
+        config->ForceFFilter = parseByte(value, config->ForceFFilter);
+        config->ForceFFilter = min(max(config->ForceFFilter, 0), 6);
+        return true;
+    }
+    if (strcmp(upperKey, "OVERRIDEFAN") == 0)       { config->OverrideFan = parseBoolean(value, config->OverrideFan); return true; }
+    if (strcmp(upperKey, "OVERCLOCKING") == 0)      { config->Overclocking = parseBoolean(value, config->Overclocking); return true; }
+    if (strcmp(upperKey, "CPUMPLLCOEFF") == 0)      { config->CPUMPLLCoeff = parseHex(value, config->CPUMPLLCoeff) & 0x00FFFFFF; return true; }
+    if (strcmp(upperKey, "NVPLLCOEFF") == 0)        { config->NVPLLCoeff = parseHex(value, config->NVPLLCoeff) & 0x00FFFFFF; return true; }
+    if (strcmp(upperKey, "INAPPLCDENABLE") == 0)    { config->InAppLCDEnable = parseBoolean(value, config->InAppLCDEnable); return true; }
+    if (strcmp(upperKey, "LCDBUS") == 0)            { config->LCDBus = parseByte(value, config->LCDBus); return true; }
+    if (strcmp(upperKey, "LCDI2CADDR") == 0)        { config->LCDI2CAddr = parseByte(value, config->LCDI2CAddr); return true; }
+    if (strcmp(upperKey, "LCDPROTO") == 0)          { config->LCDProto = parseByte(value, config->LCDProto); return true; }
+    if (strcmp(upperKey, "XONLINEDASHREDIR") == 0)  { config->XonlineDashRedir = parseBoolean(value, config->XonlineDashRedir); return true; }
+    if (strcmp(upperKey, "ADVCPUSUPPORT") == 0)     { config->AdvCPUSupport = parseBoolean(value, config->AdvCPUSupport); return true; }
+    if (strcmp(upperKey, "DISABLELIMITMEM") == 0)   { config->DisableLimitMem = parseBoolean(value, config->DisableLimitMem); return true; }
+    if (strcmp(upperKey, "APPLYTITLEPATCHES") == 0) { config->ApplyTitlePatches = parseBoolean(value, config->ApplyTitlePatches); return true; }
+    if (strcmp(upperKey, "READONLYC") == 0)         { config->ReadOnlyC = parseBoolean(value, config->ReadOnlyC); return true; }
+    if (strcmp(upperKey, "TUDATAREDIR") == 0)       { config->TUDATARedir = parseBoolean(value, config->TUDATARedir); return true; }
+    if (strcmp(upperKey, "TUDATAREDIRHDD") == 0)    { config->TUDATARedirHDD = parseByte(value, config->TUDATARedirHDD); return true; }
+    if (strcmp(upperKey, "TUDATAREDIRPART") == 0)   { config->TUDATARedirPart = parseByte(value, config->TUDATARedirPart); return true; }
+    if (strcmp(upperKey, "ENABLESCREENSHOTS") == 0) { config->EnableScreenshots = parseBoolean(value, config->EnableScreenshots); return true; }
+    if (strcmp(upperKey, "SCREENSHOTHDD") == 0)     { config->ScreenshotHDD = parseByte(value, config->ScreenshotHDD); return true; }
+    if (strcmp(upperKey, "SCREENSHOTPART") == 0)    { config->ScreenshotPart = parseByte(value, config->ScreenshotPart); return true; }
+    if (strcmp(upperKey, "IGRMASTERPORT") == 0) {
+        config->IGRMasterPort = parseByte(value, config->IGRMasterPort);
+        config->IGRMasterPort = min(max(config->IGRMasterPort, 0), 4);
+        return true;
+    }
+    if (strcmp(upperKey, "IGRDASH") == 0)     { config->IGRDash = parseHexU16(value, config->IGRDash); return true; }
+    if (strcmp(upperKey, "IGRGAME") == 0)     { config->IGRGame = parseHexU16(value, config->IGRGame); return true; }
+    if (strcmp(upperKey, "IGRFULL") == 0)     { config->IGRFull = parseHexU16(value, config->IGRFull); return true; }
+    if (strcmp(upperKey, "IGRCYCLE") == 0)    { config->IGRCycle = parseHexU16(value, config->IGRCycle); return true; }
+    if (strcmp(upperKey, "IGRSHUTDOWN") == 0) { config->IGRShutdown = parseHexU16(value, config->IGRShutdown); return true; }
+    if (strcmp(upperKey, "IGRSCREEN") == 0)   { config->IGRScreen = parseHexU16(value, config->IGRScreen); return true; }
+    return false;
+}
+
+// ============================================================================
+// formatKnownKeyValue: inverse of parseKnownKey. Writes the canonical text
+// representation of the named field into outBuf (assumed >= 128 bytes).
+// ============================================================================
+
+static void formatKnownKeyValue(const char* upperKey, cerbiosConfig* cfg, char* out)
+{
+    out[0] = 0;
+
+    // Booleans
+    if (strcmp(upperKey, "AVCHECK") == 0)          { strcpy(out, cfg->AVCheck ? "True" : "False"); return; }
+    if (strcmp(upperKey, "DEBUG") == 0)            { strcpy(out, cfg->Debug ? "True" : "False"); return; }
+    if (strcmp(upperKey, "FORCE480P") == 0)        { strcpy(out, cfg->Force480p ? "True" : "False"); return; }
+    if (strcmp(upperKey, "FORCEVGA") == 0)         { strcpy(out, cfg->ForceVGA ? "True" : "False"); return; }
+    if (strcmp(upperKey, "RTCENABLE") == 0)        { strcpy(out, cfg->RtcEnable ? "True" : "False"); return; }
+    if (strcmp(upperKey, "BLOCKDASHUPDATE") == 0)  { strcpy(out, cfg->BlockDashUpdate ? "True" : "False"); return; }
+    if (strcmp(upperKey, "RESETONEJECT") == 0)     { strcpy(out, cfg->ResetOnEject ? "True" : "False"); return; }
+    if (strcmp(upperKey, "OVERRIDEFAN") == 0)      { strcpy(out, cfg->OverrideFan ? "True" : "False"); return; }
+    if (strcmp(upperKey, "OVERCLOCKING") == 0)     { strcpy(out, cfg->Overclocking ? "True" : "False"); return; }
+    if (strcmp(upperKey, "INAPPLCDENABLE") == 0)   { strcpy(out, cfg->InAppLCDEnable ? "True" : "False"); return; }
+    if (strcmp(upperKey, "XONLINEDASHREDIR") == 0) { strcpy(out, cfg->XonlineDashRedir ? "True" : "False"); return; }
+    if (strcmp(upperKey, "ADVCPUSUPPORT") == 0)    { strcpy(out, cfg->AdvCPUSupport ? "True" : "False"); return; }
+    if (strcmp(upperKey, "DISABLELIMITMEM") == 0)  { strcpy(out, cfg->DisableLimitMem ? "True" : "False"); return; }
+    if (strcmp(upperKey, "APPLYTITLEPATCHES") == 0){ strcpy(out, cfg->ApplyTitlePatches ? "True" : "False"); return; }
+    if (strcmp(upperKey, "READONLYC") == 0)        { strcpy(out, cfg->ReadOnlyC ? "True" : "False"); return; }
+    if (strcmp(upperKey, "TUDATAREDIR") == 0)      { strcpy(out, cfg->TUDATARedir ? "True" : "False"); return; }
+    if (strcmp(upperKey, "ENABLESCREENSHOTS") == 0){ strcpy(out, cfg->EnableScreenshots ? "True" : "False"); return; }
+
+    // Bytes
+    if (strcmp(upperKey, "DRIVESETUP") == 0)       { sprintf(out, "%i", cfg->DriveSetup); return; }
+    if (strcmp(upperKey, "FANSPEED") == 0)         { sprintf(out, "%i", cfg->FanSpeed); return; }
+    if (strcmp(upperKey, "UDMAMOE") == 0)          { sprintf(out, "%i", cfg->UdmaModeMaster); return; }
+    if (strcmp(upperKey, "UDMAMODEMASTER") == 0)   { sprintf(out, "%i", cfg->UdmaModeMaster); return; }
+    if (strcmp(upperKey, "UDMAMODESLAVE") == 0)    { sprintf(out, "%i", cfg->UdmaModeSlave); return; }
+    if (strcmp(upperKey, "FORCEFFILTER") == 0)     { sprintf(out, "%i", cfg->ForceFFilter); return; }
+    if (strcmp(upperKey, "LCDBUS") == 0)           { sprintf(out, "%i", cfg->LCDBus); return; }
+    if (strcmp(upperKey, "LCDPROTO") == 0)         { sprintf(out, "%i", cfg->LCDProto); return; }
+    if (strcmp(upperKey, "TUDATAREDIRHDD") == 0)   { sprintf(out, "%i", cfg->TUDATARedirHDD); return; }
+    if (strcmp(upperKey, "TUDATAREDIRPART") == 0)  { sprintf(out, "%i", cfg->TUDATARedirPart); return; }
+    if (strcmp(upperKey, "SCREENSHOTHDD") == 0)    { sprintf(out, "%i", cfg->ScreenshotHDD); return; }
+    if (strcmp(upperKey, "SCREENSHOTPART") == 0)   { sprintf(out, "%i", cfg->ScreenshotPart); return; }
+    if (strcmp(upperKey, "IGRMASTERPORT") == 0)    { sprintf(out, "%i", cfg->IGRMasterPort); return; }
+
+    // Hex (24-bit, prefixed)
+    if (strcmp(upperKey, "CPUMPLLCOEFF") == 0)     { sprintf(out, "0x%06X", cfg->CPUMPLLCoeff & 0x00FFFFFF); return; }
+    if (strcmp(upperKey, "NVPLLCOEFF") == 0)       { sprintf(out, "0x%06X", cfg->NVPLLCoeff & 0x00FFFFFF); return; }
+
+    // Hex (8-bit, prefixed)
+    if (strcmp(upperKey, "LCDI2CADDR") == 0)       { sprintf(out, "0x%02X", cfg->LCDI2CAddr); return; }
+
+    // Hex (variable, no prefix) — IGR combos
+    if (strcmp(upperKey, "IGRDASH") == 0)          { sprintf(out, "%X", cfg->IGRDash); return; }
+    if (strcmp(upperKey, "IGRGAME") == 0)          { sprintf(out, "%X", cfg->IGRGame); return; }
+    if (strcmp(upperKey, "IGRFULL") == 0)          { sprintf(out, "%X", cfg->IGRFull); return; }
+    if (strcmp(upperKey, "IGRCYCLE") == 0)         { sprintf(out, "%X", cfg->IGRCycle); return; }
+    if (strcmp(upperKey, "IGRSHUTDOWN") == 0)      { sprintf(out, "%X", cfg->IGRShutdown); return; }
+    if (strcmp(upperKey, "IGRSCREEN") == 0)        { sprintf(out, "%X", cfg->IGRScreen); return; }
+
+    // Strings
+    if (strcmp(upperKey, "BOOTANIMPATH") == 0)     { strcpy(out, cfg->BootAnimPath); return; }
+    if (strcmp(upperKey, "FRONTLED") == 0)         { strcpy(out, cfg->FrontLed); return; }
+    if (strcmp(upperKey, "CDPATH1") == 0)          { strcpy(out, cfg->CdPath1); return; }
+    if (strcmp(upperKey, "CDPATH2") == 0)          { strcpy(out, cfg->CdPath2); return; }
+    if (strcmp(upperKey, "CDPATH3") == 0)          { strcpy(out, cfg->CdPath3); return; }
+    if (strcmp(upperKey, "DASHPATH1") == 0)        { strcpy(out, cfg->DashPath1); return; }
+    if (strcmp(upperKey, "DASHPATH2") == 0)        { strcpy(out, cfg->DashPath2); return; }
+    if (strcmp(upperKey, "DASHPATH3") == 0)        { strcpy(out, cfg->DashPath3); return; }
+    if (strcmp(upperKey, "DASHPATH") == 0)         { strcpy(out, cfg->DashPath); return; }
+}
+
+// ============================================================================
+// IniDoc lifecycle
+// ============================================================================
+
+void cerbiosIniHelper::initIniDoc(cerbiosIniDoc* doc)
+{
+    doc->lines = NULL;
+    doc->count = 0;
+    doc->capacity = 0;
+}
+
+static void docReserve(cerbiosIniDoc* doc, int n)
+{
+    if (doc->capacity >= n) return;
+    int newCap = doc->capacity == 0 ? 32 : doc->capacity * 2;
+    while (newCap < n) newCap *= 2;
+    cerbiosIniLine** newLines = (cerbiosIniLine**)malloc(sizeof(cerbiosIniLine*) * newCap);
+    if (doc->lines != NULL)
+    {
+        memcpy(newLines, doc->lines, sizeof(cerbiosIniLine*) * doc->count);
+        free(doc->lines);
+    }
+    doc->lines = newLines;
+    doc->capacity = newCap;
+}
+
+static void docAppendRaw(cerbiosIniDoc* doc, const char* line, uint32_t length)
+{
+    docReserve(doc, doc->count + 1);
+    cerbiosIniLine* l = (cerbiosIniLine*)malloc(sizeof(cerbiosIniLine));
+    l->kind = INI_LINE_RAW;
+    l->raw = (char*)malloc(length + 1);
+    memcpy(l->raw, line, length);
+    l->raw[length] = 0;
+    l->origKey = NULL;
+    l->upperKey = NULL;
+    doc->lines[doc->count++] = l;
+}
+
+static void docAppendMutable(cerbiosIniDoc* doc, const char* origKey, const char* upperKey)
+{
+    docReserve(doc, doc->count + 1);
+    cerbiosIniLine* l = (cerbiosIniLine*)malloc(sizeof(cerbiosIniLine));
+    l->kind = INI_LINE_MUTABLE;
+    l->raw = NULL;
+    l->origKey = strdup(origKey);
+    l->upperKey = strdup(upperKey);
+    doc->lines[doc->count++] = l;
+}
+
+void cerbiosIniHelper::freeIniDoc(cerbiosIniDoc* doc)
+{
+    for (int i = 0; i < doc->count; i++)
+    {
+        cerbiosIniLine* l = doc->lines[i];
+        if (l->raw) free(l->raw);
+        if (l->origKey) free(l->origKey);
+        if (l->upperKey) free(l->upperKey);
+        free(l);
+    }
+    if (doc->lines) free(doc->lines);
+    doc->lines = NULL;
+    doc->count = 0;
+    doc->capacity = 0;
+}
+
+// ============================================================================
+// parseConfig: walks the buffer line-by-line, populates struct AND builds doc.
+// ============================================================================
+
+void cerbiosIniHelper::parseConfig(cerbiosConfig* config, utils::dataContainer* configData, cerbiosIniDoc* outDoc)
 {
     char* lineBuffer = (char*)malloc(1024);
-    char* param1 = (char*)lineBuffer + 512;
-    char* param2 = (char*)param1 + 256;
-    bool skip = FALSE;
+    char* origKey = (char*)malloc(256);
+    char* value = (char*)malloc(256);
 
     uint32_t lineLength = 0;
     for (uint32_t i = 0; i < configData->size; i++)
     {
-        char currentChar = configData->data[i];
-        if (currentChar == '\t')
+        char c = configData->data[i];
+        if (c == '\r' || c == '\n')
         {
-            continue;
-        }
-        else if (currentChar == ';')
-        {
-            skip = true;
-        }
-        else if (currentChar == '\r' || currentChar == '\n')
-        {
-            if (lineLength > 0)
+            // End of line
+            if (lineLength > 0 || outDoc != NULL)
             {
-                parseConfigLine(config, param1, param2, lineBuffer, lineLength);
+                lineBuffer[lineLength] = 0;
+
+                // Detect comment / blank / key=value
+                bool isCommentOrBlank = true;
+                char first = 0;
+                for (uint32_t j = 0; j < lineLength; j++)
+                {
+                    if (lineBuffer[j] != ' ' && lineBuffer[j] != '\t')
+                    {
+                        first = lineBuffer[j];
+                        isCommentOrBlank = (first == ';');
+                        break;
+                    }
+                }
+
+                if (isCommentOrBlank)
+                {
+                    if (outDoc) docAppendRaw(outDoc, lineBuffer, lineLength);
+                }
+                else
+                {
+                    // Try key=value split
+                    if (splitKeyValue(lineBuffer, lineLength, origKey, value))
+                    {
+                        char upperKey[256];
+                        strcpy(upperKey, origKey);
+                        upperCase(upperKey);
+
+                        if (parseKnownKey(config, upperKey, value))
+                        {
+                            if (outDoc) docAppendMutable(outDoc, origKey, upperKey);
+                        }
+                        else
+                        {
+                            if (outDoc) docAppendRaw(outDoc, lineBuffer, lineLength);
+                        }
+                    }
+                    else
+                    {
+                        if (outDoc) docAppendRaw(outDoc, lineBuffer, lineLength);
+                    }
+                }
+
                 lineLength = 0;
             }
-            skip = false;
             continue;
         }
-        else if (lineLength < 512 && skip == FALSE)
+        if (c == '\t') continue;
+        if (lineLength < 1023)
         {
-            lineBuffer[lineLength] = currentChar;
-            lineLength++;
+            lineBuffer[lineLength++] = c;
         }
     }
 
+    // Trailing line without terminator
     if (lineLength > 0)
     {
-        parseConfigLine(config, param1, param2, lineBuffer, lineLength);
+        lineBuffer[lineLength] = 0;
+        bool isCommentOrBlank = true;
+        for (uint32_t j = 0; j < lineLength; j++)
+        {
+            if (lineBuffer[j] != ' ' && lineBuffer[j] != '\t')
+            {
+                isCommentOrBlank = (lineBuffer[j] == ';');
+                break;
+            }
+        }
+        if (isCommentOrBlank)
+        {
+            if (outDoc) docAppendRaw(outDoc, lineBuffer, lineLength);
+        }
+        else if (splitKeyValue(lineBuffer, lineLength, origKey, value))
+        {
+            char upperKey[256];
+            strcpy(upperKey, origKey);
+            upperCase(upperKey);
+            if (parseKnownKey(config, upperKey, value))
+            {
+                if (outDoc) docAppendMutable(outDoc, origKey, upperKey);
+            }
+            else if (outDoc)
+            {
+                docAppendRaw(outDoc, lineBuffer, lineLength);
+            }
+        }
+        else if (outDoc)
+        {
+            docAppendRaw(outDoc, lineBuffer, lineLength);
+        }
     }
 
     free(lineBuffer);
+    free(origKey);
+    free(value);
 }
 
-cerbiosConfig cerbiosIniHelper::loadConfig(const char* path, cerbiosVersion version)
-{
-	// Init default config
+// ============================================================================
+// loadConfig: defaults + parse, optionally building a round-trip doc.
+// ============================================================================
 
+cerbiosConfig cerbiosIniHelper::loadConfig(const char* path, cerbiosVersion version, cerbiosIniDoc* outDoc)
+{
 	cerbiosConfig config;
 	memset(&config, 0, sizeof(config));
 	setConfigDefault(&config, version);
@@ -351,7 +487,7 @@ cerbiosConfig cerbiosIniHelper::loadConfig(const char* path, cerbiosVersion vers
 			if (fileSystem::fileRead(fileHandle, buffer, fileSize, bytesRead))
 			{
 				utils::dataContainer configData(buffer, fileSize, fileSize);
-				parseConfig(&config, &configData);
+				parseConfig(&config, &configData, outDoc);
 			}
 			free(buffer);
 		}
@@ -359,13 +495,12 @@ cerbiosConfig cerbiosIniHelper::loadConfig(const char* path, cerbiosVersion vers
 	}
 
 	// Post-load normalization
-
 	config.FanSpeed = min(((config.FanSpeed / 10) * 10), 100);
 
 	for (int i = 0; i < 4; i++)
 	{
-		char value = config.FrontLed[i];
-		if (value != 'G' && value != 'R' && value != 'A' && value != 'O')
+		char v = config.FrontLed[i];
+		if (v != 'G' && v != 'R' && v != 'A' && v != 'O')
 		{
 			config.FrontLed[i] = 'G';
 		}
@@ -373,6 +508,10 @@ cerbiosConfig cerbiosIniHelper::loadConfig(const char* path, cerbiosVersion vers
 
 	return config;
 }
+
+// ============================================================================
+// Canned-layout emitters (used when no doc / first save)
+// ============================================================================
 
 static void appendLine(char* buffer, const char* text)
 {
@@ -720,9 +859,36 @@ static void buildConfigCurrent(cerbiosConfig* config, char* buffer)
 	appendKVBool(buffer, "Debug", config->Debug);
 }
 
-void cerbiosIniHelper::buildConfig(cerbiosConfig* config, cerbiosVersion version, char* buffer)
+// ============================================================================
+// buildConfig — round-trip if doc present, otherwise canned layout
+// ============================================================================
+
+void cerbiosIniHelper::buildConfig(cerbiosConfig* config, cerbiosVersion version, cerbiosIniDoc* doc, char* buffer)
 {
 	buffer[0] = 0;
+
+	if (doc != NULL && doc->count > 0)
+	{
+		char valBuf[256];
+		for (int i = 0; i < doc->count; i++)
+		{
+			cerbiosIniLine* l = doc->lines[i];
+			if (l->kind == INI_LINE_RAW)
+			{
+				if (l->raw) strcat(buffer, l->raw);
+				strcat(buffer, "\r\n");
+			}
+			else
+			{
+				formatKnownKeyValue(l->upperKey, config, valBuf);
+				strcat(buffer, l->origKey);
+				strcat(buffer, " = ");
+				strcat(buffer, valBuf);
+				strcat(buffer, "\r\n");
+			}
+		}
+		return;
+	}
 
 	if (version == CerbiosVersionCurrent)
 	{
@@ -781,7 +947,6 @@ static void setConfigDefaultLegacy(cerbiosConfig* config)
 
 static void setConfigDefaultCurrent(cerbiosConfig* config)
 {
-	// Mirrors cerbios3.0.0.ini exactly
 	strcpy(config->DashPath, "HDD0-C:\\evoxdash.xbe");
 	strcpy(config->BootAnimPath, "HDD0-E:\\Cerbios\\BootAnims\\Xbox\\bootanim.xbe");
 	config->AVCheck = 1;

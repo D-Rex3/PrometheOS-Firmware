@@ -22,8 +22,9 @@ private:
 	bool mHasFilePicker;
 	bool mShowingFilePicker;
 	bool mShowingInfo;
-	bool mAdvancedUnlocked;
+	bool mShowingConfirm;
 	cerbiosConfig mConfig;
+	cerbiosIniDoc mDoc;
 	int* mActiveControls;
 	int mActiveControlCount;
 	char* mShortCdPath1;
@@ -39,5 +40,4 @@ private:
 	char* getOptionInfo(int controlId);
 	static void onPathClosingCallback(sceneResult result, void* context, scene* scene);
 	static void onFrontLedClosingCallback(sceneResult result, void* context, scene* scene);
-	static void onHexClosingCallback(sceneResult result, void* context, scene* scene);
 };

@@ -2,7 +2,6 @@
 #include "sceneManager.h"
 #include "keyboardScene.h"
 #include "frontLedSelectorScene.h"
-#include "hexSelectorScene.h"
 #include "filePickerScene.h"
 
 #include "..\context.h"
@@ -28,15 +27,8 @@ enum controlKind
 	KIND_FFILTER,
 	KIND_LED,
 	KIND_PATH,
-	KIND_HEX24,
-	KIND_HEX_COMBO,
-	KIND_HEX_BYTE,
-	KIND_BUS_BIN,
-	KIND_LCDPROTO,
 	KIND_HDD_BIN,
-	KIND_PARTITION,
-	KIND_IGRPORT,
-	KIND_ADV_UNLOCK
+	KIND_PARTITION
 };
 
 // Stable control ids; index into kInfoTexts.
@@ -70,26 +62,10 @@ enum
 	CID_ApplyTitlePatches,
 	CID_ReadOnlyC,
 	CID_InAppLCDEnable,
-	CID_LCDBus,
-	CID_LCDI2CAddr,
-	CID_LCDProto,
 	CID_TUDATARedir,
-	CID_TUDATARedirHDD,
-	CID_TUDATARedirPart,
 	CID_EnableScreenshots,
 	CID_ScreenshotHDD,
 	CID_ScreenshotPart,
-	CID_IGRMasterPort,
-	CID_IGRDash,
-	CID_IGRGame,
-	CID_IGRFull,
-	CID_IGRCycle,
-	CID_IGRShutdown,
-	CID_IGRScreen,
-	CID_AdvUnlock,
-	CID_Overclocking,
-	CID_CPUMPLLCoeff,
-	CID_NVPLLCoeff,
 	CID_COUNT
 };
 
@@ -101,61 +77,45 @@ struct controlDescriptor
 {
 	int id;
 	unsigned char versions;
-	bool advancedOnly;
+	int gatedBy;            // 0 = always visible; otherwise CID of a byte field that must be != 0
 	const char* label;
 	int kind;
-	size_t offset;  // offsetof in cerbiosConfig; ignored for KIND_ADV_UNLOCK
+	size_t offset;
 };
 
 static const controlDescriptor kControls[] = {
-	{ CID_DriveSetup,        VB, false, "Drive Setup:",         KIND_DRIVE_SETUP, offsetof(cerbiosConfig, DriveSetup) },
-	{ CID_AVCheck,           VB, false, "AV Check:",            KIND_BOOL,        offsetof(cerbiosConfig, AVCheck) },
-	{ CID_Debug,             VB, false, "Debug:",               KIND_BOOL,        offsetof(cerbiosConfig, Debug) },
-	{ CID_Force480p,         VB, false, "Force 480p:",          KIND_BOOL,        offsetof(cerbiosConfig, Force480p) },
-	{ CID_ForceVGA,          VB, false, "Force VGA:",           KIND_BOOL,        offsetof(cerbiosConfig, ForceVGA) },
-	{ CID_ForceFFilter,      VC, false, "Force F-Filter:",      KIND_FFILTER,     offsetof(cerbiosConfig, ForceFFilter) },
-	{ CID_UdmaModeMaster,    VB, false, "Udma Master:",         KIND_UDMA,        offsetof(cerbiosConfig, UdmaModeMaster) },
-	{ CID_UdmaModeSlave,     VB, false, "Udma Slave:",          KIND_UDMA,        offsetof(cerbiosConfig, UdmaModeSlave) },
-	{ CID_FanSpeed,          VB, false, "Fan Speed:",           KIND_FAN,         offsetof(cerbiosConfig, FanSpeed) },
-	{ CID_OverrideFan,       VC, false, "Override Fan:",        KIND_BOOL,        offsetof(cerbiosConfig, OverrideFan) },
-	{ CID_FrontLed,          VB, false, "Front Led:",           KIND_LED,         offsetof(cerbiosConfig, FrontLed) },
-	{ CID_BlockDashUpdate,   VB, false, "Block Dash Update:",   KIND_BOOL,        offsetof(cerbiosConfig, BlockDashUpdate) },
-	{ CID_ResetOnEject,      VB, false, "Reset On Eject:",      KIND_BOOL,        offsetof(cerbiosConfig, ResetOnEject) },
-	{ CID_RtcEnable,         VB, false, "Rtc Enable:",          KIND_BOOL,        offsetof(cerbiosConfig, RtcEnable) },
-	{ CID_CdPath1,           VL, false, "CD Path 1:",           KIND_PATH,        offsetof(cerbiosConfig, CdPath1) },
-	{ CID_CdPath2,           VL, false, "CD Path 2:",           KIND_PATH,        offsetof(cerbiosConfig, CdPath2) },
-	{ CID_CdPath3,           VL, false, "CD Path 3:",           KIND_PATH,        offsetof(cerbiosConfig, CdPath3) },
-	{ CID_DashPath1,         VL, false, "Dash Path 1:",         KIND_PATH,        offsetof(cerbiosConfig, DashPath1) },
-	{ CID_DashPath2,         VL, false, "Dash Path 2:",         KIND_PATH,        offsetof(cerbiosConfig, DashPath2) },
-	{ CID_DashPath3,         VL, false, "Dash Path 3:",         KIND_PATH,        offsetof(cerbiosConfig, DashPath3) },
-	{ CID_DashPath,          VC, false, "Dash Path:",           KIND_PATH,        offsetof(cerbiosConfig, DashPath) },
-	{ CID_BootAnimPath,      VB, false, "Boot Anim Path:",      KIND_PATH,        offsetof(cerbiosConfig, BootAnimPath) },
-	{ CID_XonlineDashRedir,  VC, false, "Xonline Dash Redir:",  KIND_BOOL,        offsetof(cerbiosConfig, XonlineDashRedir) },
-	{ CID_AdvCPUSupport,     VC, false, "Adv CPU Support:",     KIND_BOOL,        offsetof(cerbiosConfig, AdvCPUSupport) },
-	{ CID_DisableLimitMem,   VC, false, "Disable Limit Mem:",   KIND_BOOL,        offsetof(cerbiosConfig, DisableLimitMem) },
-	{ CID_ApplyTitlePatches, VC, false, "Apply Title Patches:", KIND_BOOL,        offsetof(cerbiosConfig, ApplyTitlePatches) },
-	{ CID_ReadOnlyC,         VC, false, "Read-Only C:",         KIND_BOOL,        offsetof(cerbiosConfig, ReadOnlyC) },
-	{ CID_InAppLCDEnable,    VC, false, "In-App LCD:",          KIND_BOOL,        offsetof(cerbiosConfig, InAppLCDEnable) },
-	{ CID_LCDBus,            VC, false, "LCD Bus:",             KIND_BUS_BIN,     offsetof(cerbiosConfig, LCDBus) },
-	{ CID_LCDI2CAddr,        VC, false, "LCD I2C Addr:",        KIND_HEX_BYTE,    offsetof(cerbiosConfig, LCDI2CAddr) },
-	{ CID_LCDProto,          VC, false, "LCD Protocol:",        KIND_LCDPROTO,    offsetof(cerbiosConfig, LCDProto) },
-	{ CID_TUDATARedir,       VC, false, "TUDATA Redirect:",     KIND_BOOL,        offsetof(cerbiosConfig, TUDATARedir) },
-	{ CID_TUDATARedirHDD,    VC, false, "TUDATA Redir HDD:",    KIND_HDD_BIN,     offsetof(cerbiosConfig, TUDATARedirHDD) },
-	{ CID_TUDATARedirPart,   VC, false, "TUDATA Redir Part:",   KIND_PARTITION,   offsetof(cerbiosConfig, TUDATARedirPart) },
-	{ CID_EnableScreenshots, VC, false, "Enable Screenshots:",  KIND_BOOL,        offsetof(cerbiosConfig, EnableScreenshots) },
-	{ CID_ScreenshotHDD,     VC, false, "Screenshot HDD:",      KIND_HDD_BIN,     offsetof(cerbiosConfig, ScreenshotHDD) },
-	{ CID_ScreenshotPart,    VC, false, "Screenshot Part:",     KIND_PARTITION,   offsetof(cerbiosConfig, ScreenshotPart) },
-	{ CID_IGRMasterPort,     VC, false, "IGR Master Port:",     KIND_IGRPORT,     offsetof(cerbiosConfig, IGRMasterPort) },
-	{ CID_IGRDash,           VC, false, "IGR Dash:",            KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRDash) },
-	{ CID_IGRGame,           VC, false, "IGR Game:",            KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRGame) },
-	{ CID_IGRFull,           VC, false, "IGR Full:",            KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRFull) },
-	{ CID_IGRCycle,          VC, false, "IGR Cycle:",           KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRCycle) },
-	{ CID_IGRShutdown,       VC, false, "IGR Shutdown:",        KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRShutdown) },
-	{ CID_IGRScreen,         VC, false, "IGR Screenshot:",      KIND_HEX_COMBO,   offsetof(cerbiosConfig, IGRScreen) },
-	{ CID_AdvUnlock,         VC, false, "Unlock Advanced:",     KIND_ADV_UNLOCK,  0 },
-	{ CID_Overclocking,      VC, true,  "Overclocking:",        KIND_BOOL,        offsetof(cerbiosConfig, Overclocking) },
-	{ CID_CPUMPLLCoeff,      VC, true,  "CPU Overclock:",       KIND_HEX24,       offsetof(cerbiosConfig, CPUMPLLCoeff) },
-	{ CID_NVPLLCoeff,        VC, true,  "GPU Overclock:",       KIND_HEX24,       offsetof(cerbiosConfig, NVPLLCoeff) },
+	{ CID_DriveSetup,        VB, 0,                    "Drive Setup:",         KIND_DRIVE_SETUP, offsetof(cerbiosConfig, DriveSetup) },
+	{ CID_AVCheck,           VB, 0,                    "AV Check:",            KIND_BOOL,        offsetof(cerbiosConfig, AVCheck) },
+	{ CID_Debug,             VB, 0,                    "Debug:",               KIND_BOOL,        offsetof(cerbiosConfig, Debug) },
+	{ CID_Force480p,         VB, 0,                    "Force 480p:",          KIND_BOOL,        offsetof(cerbiosConfig, Force480p) },
+	{ CID_ForceVGA,          VB, 0,                    "Force VGA:",           KIND_BOOL,        offsetof(cerbiosConfig, ForceVGA) },
+	{ CID_ForceFFilter,      VC, 0,                    "Force F-Filter:",      KIND_FFILTER,     offsetof(cerbiosConfig, ForceFFilter) },
+	{ CID_UdmaModeMaster,    VB, 0,                    "Udma Master:",         KIND_UDMA,        offsetof(cerbiosConfig, UdmaModeMaster) },
+	{ CID_UdmaModeSlave,     VB, 0,                    "Udma Slave:",          KIND_UDMA,        offsetof(cerbiosConfig, UdmaModeSlave) },
+	{ CID_FanSpeed,          VB, 0,                    "Fan Speed:",           KIND_FAN,         offsetof(cerbiosConfig, FanSpeed) },
+	{ CID_OverrideFan,       VC, 0,                    "Override Fan:",        KIND_BOOL,        offsetof(cerbiosConfig, OverrideFan) },
+	{ CID_FrontLed,          VB, 0,                    "Front Led:",           KIND_LED,         offsetof(cerbiosConfig, FrontLed) },
+	{ CID_BlockDashUpdate,   VB, 0,                    "Block Dash Update:",   KIND_BOOL,        offsetof(cerbiosConfig, BlockDashUpdate) },
+	{ CID_ResetOnEject,      VB, 0,                    "Reset On Eject:",      KIND_BOOL,        offsetof(cerbiosConfig, ResetOnEject) },
+	{ CID_RtcEnable,         VB, 0,                    "Rtc Enable:",          KIND_BOOL,        offsetof(cerbiosConfig, RtcEnable) },
+	{ CID_CdPath1,           VL, 0,                    "CD Path 1:",           KIND_PATH,        offsetof(cerbiosConfig, CdPath1) },
+	{ CID_CdPath2,           VL, 0,                    "CD Path 2:",           KIND_PATH,        offsetof(cerbiosConfig, CdPath2) },
+	{ CID_CdPath3,           VL, 0,                    "CD Path 3:",           KIND_PATH,        offsetof(cerbiosConfig, CdPath3) },
+	{ CID_DashPath1,         VL, 0,                    "Dash Path 1:",         KIND_PATH,        offsetof(cerbiosConfig, DashPath1) },
+	{ CID_DashPath2,         VL, 0,                    "Dash Path 2:",         KIND_PATH,        offsetof(cerbiosConfig, DashPath2) },
+	{ CID_DashPath3,         VL, 0,                    "Dash Path 3:",         KIND_PATH,        offsetof(cerbiosConfig, DashPath3) },
+	{ CID_DashPath,          VC, 0,                    "Dash Path:",           KIND_PATH,        offsetof(cerbiosConfig, DashPath) },
+	{ CID_BootAnimPath,      VB, 0,                    "Boot Anim Path:",      KIND_PATH,        offsetof(cerbiosConfig, BootAnimPath) },
+	{ CID_XonlineDashRedir,  VC, 0,                    "Xonline Dash Redir:",  KIND_BOOL,        offsetof(cerbiosConfig, XonlineDashRedir) },
+	{ CID_AdvCPUSupport,     VC, 0,                    "Adv CPU Support:",     KIND_BOOL,        offsetof(cerbiosConfig, AdvCPUSupport) },
+	{ CID_DisableLimitMem,   VC, 0,                    "Disable Limit Mem:",   KIND_BOOL,        offsetof(cerbiosConfig, DisableLimitMem) },
+	{ CID_ApplyTitlePatches, VC, 0,                    "Apply Title Patches:", KIND_BOOL,        offsetof(cerbiosConfig, ApplyTitlePatches) },
+	{ CID_ReadOnlyC,         VC, 0,                    "Read-Only C:",         KIND_BOOL,        offsetof(cerbiosConfig, ReadOnlyC) },
+	{ CID_InAppLCDEnable,    VC, 0,                    "In-App LCD:",          KIND_BOOL,        offsetof(cerbiosConfig, InAppLCDEnable) },
+	{ CID_TUDATARedir,       VC, 0,                    "TUDATA Redirect:",     KIND_BOOL,        offsetof(cerbiosConfig, TUDATARedir) },
+	{ CID_EnableScreenshots, VC, 0,                    "Enable Screenshots:",  KIND_BOOL,        offsetof(cerbiosConfig, EnableScreenshots) },
+	{ CID_ScreenshotHDD,     VC, CID_EnableScreenshots,"Screenshot HDD:",      KIND_HDD_BIN,     offsetof(cerbiosConfig, ScreenshotHDD) },
+	{ CID_ScreenshotPart,    VC, CID_EnableScreenshots,"Screenshot Part:",     KIND_PARTITION,   offsetof(cerbiosConfig, ScreenshotPart) },
 };
 
 static const int kControlsCount = (int)(sizeof(kControls) / sizeof(kControls[0]));
@@ -179,10 +139,7 @@ static const char* kDriveModes[] = { "HDD & DVD", "HDD & No DVD (Legacy)", "HDD 
 static const char* kUdmaModes[] = { "Auto (Startech Adapter)", "Auto (Generic Adapter)", "UDMA 2 (Default / Stock)", "UDMA 3 (Ultra DMA 80-Conductor)", "UDMA 4 (Ultra DMA 80-Conductor)", "UDMA 5 (Ultra DMA 80-Conductor)", "UDMA 6 (Experimental)" };
 static const char* kFanSpeeds[] = { "Auto", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%" };
 static const char* kFFilter[] = { "Off", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5", "System/Game Default" };
-static const char* kBusBin[] = { "SMBus", "X3LCD" };
-static const char* kLcdProto[] = { "HD44780 / X3LCD", "US2066 (NHD-0420CW)" };
 static const char* kHddBin[] = { "Master", "Slave" };
-static const char* kIgrPort[] = { "ALL", "Port 1", "Port 2", "Port 3", "Port 4" };
 
 static const char* partitionLabel(unsigned char value)
 {
@@ -256,29 +213,6 @@ void cerbiosIniEditorScene::onFrontLedClosingCallback(sceneResult result, void* 
 	self->mNeedsSave = true;
 }
 
-void cerbiosIniEditorScene::onHexClosingCallback(sceneResult result, void* context, scene* scene)
-{
-	cerbiosIniEditorScene* self = (cerbiosIniEditorScene*)context;
-	hexSelectorScene* closingScene = (hexSelectorScene*)scene;
-	uint32_t value = closingScene->getValue();
-	int controlId = kControls[self->mActiveControls[self->mSelectedControl]].id;
-	const controlDescriptor* desc = findById(controlId);
-	if (desc == NULL) return;
-	if (desc->kind == KIND_HEX24)
-	{
-		*u32Ptr(&self->mConfig, desc->offset) = value & 0x00FFFFFF;
-	}
-	else if (desc->kind == KIND_HEX_COMBO)
-	{
-		*u16Ptr(&self->mConfig, desc->offset) = (uint16_t)value;
-	}
-	else if (desc->kind == KIND_HEX_BYTE)
-	{
-		*ucPtr(&self->mConfig, desc->offset) = (unsigned char)value;
-	}
-	self->mNeedsSave = true;
-}
-
 // ============================================================================
 // Constructor / destructor
 // ============================================================================
@@ -287,7 +221,8 @@ cerbiosIniEditorScene::cerbiosIniEditorScene(const char* iniPath, cerbiosVersion
 {
 	mIniPath = strdup(iniPath);
 	mVersion = version;
-	mConfig = cerbiosIniHelper::loadConfig(mIniPath, mVersion);
+	cerbiosIniHelper::initIniDoc(&mDoc);
+	mConfig = cerbiosIniHelper::loadConfig(mIniPath, mVersion, &mDoc);
 	mShortCdPath1 = shortenString(mConfig.CdPath1);
 	mShortCdPath2 = shortenString(mConfig.CdPath2);
 	mShortCdPath3 = shortenString(mConfig.CdPath3);
@@ -301,7 +236,7 @@ cerbiosIniEditorScene::cerbiosIniEditorScene(const char* iniPath, cerbiosVersion
 	mNeedsSave = false;
 	mShowingFilePicker = false;
 	mShowingInfo = false;
-	mAdvancedUnlocked = false;
+	mShowingConfirm = false;
 	mActiveControls = NULL;
 	mActiveControlCount = 0;
 	rebuildActiveControls();
@@ -309,6 +244,7 @@ cerbiosIniEditorScene::cerbiosIniEditorScene(const char* iniPath, cerbiosVersion
 
 cerbiosIniEditorScene::~cerbiosIniEditorScene()
 {
+	cerbiosIniHelper::freeIniDoc(&mDoc);
 	free(mIniPath);
 	free(mActiveControls);
 	free(mShortCdPath1);
@@ -337,7 +273,12 @@ void cerbiosIniEditorScene::rebuildActiveControls()
 	{
 		const controlDescriptor* desc = &kControls[i];
 		if ((desc->versions & versionMask) == 0) continue;
-		if (desc->advancedOnly && !mAdvancedUnlocked) continue;
+		if (desc->gatedBy != 0)
+		{
+			const controlDescriptor* gate = findById(desc->gatedBy);
+			if (gate == NULL) continue;
+			if (*ucPtr(&mConfig, gate->offset) == 0) continue;
+		}
 		mActiveControls[mActiveControlCount++] = i;
 	}
 
@@ -395,6 +336,34 @@ static void cycleFan(unsigned char* v, int dir)
 
 void cerbiosIniEditorScene::update()
 {
+	// Confirm-defaults modal short-circuits everything
+	if (mShowingConfirm)
+	{
+		if (inputManager::buttonPressed(ButtonA))
+		{
+			cerbiosIniHelper::setConfigDefault(&mConfig, mVersion);
+			// Drop the round-trip doc so save emits the canned full-defaults layout
+			cerbiosIniHelper::freeIniDoc(&mDoc);
+			cerbiosIniHelper::initIniDoc(&mDoc);
+			rebuildActiveControls();
+			mNeedsSave = true;
+			refreshShortPath(CID_CdPath1);
+			refreshShortPath(CID_CdPath2);
+			refreshShortPath(CID_CdPath3);
+			refreshShortPath(CID_DashPath1);
+			refreshShortPath(CID_DashPath2);
+			refreshShortPath(CID_DashPath3);
+			refreshShortPath(CID_DashPath);
+			refreshShortPath(CID_BootAnimPath);
+			mShowingConfirm = false;
+		}
+		else if (inputManager::buttonPressed(ButtonB))
+		{
+			mShowingConfirm = false;
+		}
+		return;
+	}
+
 	// Info overlay short-circuits all other input
 	if (mShowingInfo)
 	{
@@ -416,25 +385,14 @@ void cerbiosIniEditorScene::update()
 
 	if (inputManager::buttonPressed(ButtonY))
 	{
-		cerbiosIniHelper::setConfigDefault(&mConfig, mVersion);
-		mAdvancedUnlocked = false;
-		rebuildActiveControls();
-		mNeedsSave = true;
-		// Refresh all short paths
-		refreshShortPath(CID_CdPath1);
-		refreshShortPath(CID_CdPath2);
-		refreshShortPath(CID_CdPath3);
-		refreshShortPath(CID_DashPath1);
-		refreshShortPath(CID_DashPath2);
-		refreshShortPath(CID_DashPath3);
-		refreshShortPath(CID_DashPath);
-		refreshShortPath(CID_BootAnimPath);
+		mShowingConfirm = true;
+		return;
 	}
 
 	if (mNeedsSave && inputManager::buttonPressed(ButtonX))
 	{
 		char* buffer = (char*)malloc(65536);
-		cerbiosIniHelper::buildConfig(&mConfig, mVersion, buffer);
+		cerbiosIniHelper::buildConfig(&mConfig, mVersion, &mDoc, buffer);
 		cerbiosIniHelper::saveConfig(mIniPath, buffer);
 		free(buffer);
 		mNeedsSave = false;
@@ -476,6 +434,8 @@ void cerbiosIniEditorScene::update()
 			unsigned char* v = ucPtr(&mConfig, desc->offset);
 			*v = (*v == 0) ? 1 : 0;
 			mNeedsSave = true;
+			// Rebuild active list so gated children (e.g. Screenshot HDD/Part) appear/disappear
+			rebuildActiveControls();
 		} break;
 
 		case KIND_DRIVE_SETUP:
@@ -502,8 +462,6 @@ void cerbiosIniEditorScene::update()
 			mNeedsSave = true;
 		} break;
 
-		case KIND_BUS_BIN:
-		case KIND_LCDPROTO:
 		case KIND_HDD_BIN:
 		{
 			cycleByte(ucPtr(&mConfig, desc->offset), dir, 0, 1);
@@ -513,12 +471,6 @@ void cerbiosIniEditorScene::update()
 		case KIND_PARTITION:
 		{
 			cyclePartition(ucPtr(&mConfig, desc->offset), dir);
-			mNeedsSave = true;
-		} break;
-
-		case KIND_IGRPORT:
-		{
-			cycleByte(ucPtr(&mConfig, desc->offset), dir, 0, 4);
 			mNeedsSave = true;
 		} break;
 
@@ -535,36 +487,6 @@ void cerbiosIniEditorScene::update()
 				new keyboardScene(99, "Please enter path...", desc->label, current),
 				"", this, onPathClosingCallback));
 		} break;
-
-		case KIND_HEX24:
-		{
-			uint32_t value = *u32Ptr(&mConfig, desc->offset);
-			sceneManager::pushScene(new sceneContainer(sceneItemGenericScene,
-				new hexSelectorScene(desc->label, value, 6, true),
-				"", this, onHexClosingCallback));
-		} break;
-
-		case KIND_HEX_COMBO:
-		{
-			uint32_t value = (uint32_t)(*u16Ptr(&mConfig, desc->offset));
-			sceneManager::pushScene(new sceneContainer(sceneItemGenericScene,
-				new hexSelectorScene(desc->label, value, 4, false),
-				"", this, onHexClosingCallback));
-		} break;
-
-		case KIND_HEX_BYTE:
-		{
-			uint32_t value = (uint32_t)(*ucPtr(&mConfig, desc->offset));
-			sceneManager::pushScene(new sceneContainer(sceneItemGenericScene,
-				new hexSelectorScene(desc->label, value, 2, true),
-				"", this, onHexClosingCallback));
-		} break;
-
-		case KIND_ADV_UNLOCK:
-		{
-			mAdvancedUnlocked = !mAdvancedUnlocked;
-			rebuildActiveControls();
-		} break;
 	}
 }
 
@@ -575,8 +497,7 @@ void cerbiosIniEditorScene::update()
 static const char* valueTextFor(const controlDescriptor* desc, cerbiosConfig* cfg,
 	char* mShortCdPath1, char* mShortCdPath2, char* mShortCdPath3,
 	char* mShortDashPath1, char* mShortDashPath2, char* mShortDashPath3,
-	char* mShortDashPath, char* mShortBootAnimPath, bool advUnlocked,
-	char* scratch /*at least 16 bytes*/)
+	char* mShortDashPath, char* mShortBootAnimPath)
 {
 	switch (desc->kind)
 	{
@@ -585,27 +506,9 @@ static const char* valueTextFor(const controlDescriptor* desc, cerbiosConfig* cf
 		case KIND_UDMA:        return kUdmaModes[*ucPtr(cfg, desc->offset)];
 		case KIND_FAN:         return kFanSpeeds[*ucPtr(cfg, desc->offset) / 10];
 		case KIND_FFILTER:     return kFFilter[*ucPtr(cfg, desc->offset)];
-		case KIND_BUS_BIN:     return kBusBin[*ucPtr(cfg, desc->offset) ? 1 : 0];
-		case KIND_LCDPROTO:    return kLcdProto[*ucPtr(cfg, desc->offset) ? 1 : 0];
 		case KIND_HDD_BIN:     return kHddBin[*ucPtr(cfg, desc->offset) ? 1 : 0];
 		case KIND_PARTITION:   return partitionLabel(*ucPtr(cfg, desc->offset));
-		case KIND_IGRPORT:     return kIgrPort[*ucPtr(cfg, desc->offset) > 4 ? 0 : *ucPtr(cfg, desc->offset)];
 		case KIND_LED:         return cfg->FrontLed;
-		case KIND_HEX24:
-		{
-			sprintf(scratch, "0x%06X", *u32Ptr(cfg, desc->offset) & 0x00FFFFFF);
-			return scratch;
-		}
-		case KIND_HEX_COMBO:
-		{
-			sprintf(scratch, "%X", *u16Ptr(cfg, desc->offset));
-			return scratch;
-		}
-		case KIND_HEX_BYTE:
-		{
-			sprintf(scratch, "0x%02X", *ucPtr(cfg, desc->offset));
-			return scratch;
-		}
 		case KIND_PATH:
 		{
 			switch (desc->id)
@@ -621,7 +524,6 @@ static const char* valueTextFor(const controlDescriptor* desc, cerbiosConfig* cf
 				default: return "";
 			}
 		}
-		case KIND_ADV_UNLOCK: return kBools[advUnlocked ? 1 : 0];
 	}
 	return "";
 }
@@ -645,7 +547,6 @@ void cerbiosIniEditorScene::render()
 	}
 
 	int32_t itemCount = min(start + maxItems, menuItems) - start;
-	char scratch[16];
 
 	if (itemCount > 0)
 	{
@@ -659,8 +560,7 @@ void cerbiosIniEditorScene::render()
 			const char* valueText = valueTextFor(desc, &mConfig,
 				mShortCdPath1, mShortCdPath2, mShortCdPath3,
 				mShortDashPath1, mShortDashPath2, mShortDashPath3,
-				mShortDashPath, mShortBootAnimPath, mAdvancedUnlocked,
-				scratch);
+				mShortDashPath, mShortBootAnimPath);
 			component::splitButton(mSelectedControl == index, false, desc->label, 165, valueText, 40, yPos, 640, 30);
 			yPos += 40;
 		}
@@ -673,13 +573,30 @@ void cerbiosIniEditorScene::render()
 	uint32_t yPos = (context::getBufferHeight() - ((itemCount * 40) - 10)) / 2;
 	yPos += theme::getCenterOffset();
 
-	if (mShowingInfo)
+	if (mShowingConfirm)
+	{
+		const char* confirmText =
+			"Reset to defaults?\n"
+			"\n"
+			"This will overwrite cerbios.ini with the version\n"
+			"defaults, INCLUDING any advanced settings such as\n"
+			"Overclocking, CPU/GPU coefficients, IGR combos,\n"
+			"and LCD config you may have edited manually on PC.\n"
+			"\n"
+			"\xC2\xA1 Confirm    \xC2\xA2 Cancel";
+		component::textBox((char*)confirmText, true, false, horizAlignmentLeft, 60, yPos + 5, 600, 260, true, true);
+	}
+	else if (mShowingInfo)
 	{
 		char* infoStr = getOptionInfo(selDesc->id);
 		component::textBox(infoStr, true, false, horizAlignmentLeft, 60, yPos + 5, 600, 260, true, true);
 	}
 
-	if (!mShowingInfo)
+	if (mShowingConfirm)
+	{
+		drawing::drawBitmapString(context::getBitmapFontSmall(), "\xC2\xA1 Confirm  \xC2\xA2 Cancel", theme::getFooterTextColor(), 40, theme::getFooterY());
+	}
+	else if (!mShowingInfo)
 	{
 		const char* baseBtns = "\xC2\xA1 or \xC2\xB2\xC2\xB3 Change Value, \xC2\xA4 Defaults";
 		const char* filePkrBtn = ", \xC2\xB5 Browse";
@@ -696,7 +613,10 @@ void cerbiosIniEditorScene::render()
 		free(buttons);
 	}
 
-	drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), mShowingInfo ? "\xC2\xA2 Back" : "\xC2\xB6 Info  \xC2\xA2 Back", theme::getFooterTextColor(), horizAlignmentRight, 40, theme::getFooterY(), 640);
+	if (!mShowingConfirm)
+	{
+		drawing::drawBitmapStringAligned(context::getBitmapFontSmall(), mShowingInfo ? "\xC2\xA2 Back" : "\xC2\xB6 Info  \xC2\xA2 Back", theme::getFooterTextColor(), horizAlignmentRight, 40, theme::getFooterY(), 640);
+	}
 }
 
 // ============================================================================
@@ -892,108 +812,38 @@ char* cerbiosIniEditorScene::getOptionInfo(int controlId)
 			"Enables in-game LCD for FPS, temps, RAM, etc.\n"
 			"\n"
 			"Default = False";
-		case CID_LCDBus: return (char*)
-			"LCD Bus (LCDBus):\n"
-			"\n"
-			"0 = SMBus, 1 = X3LCD via X3 modchip\n"
-			"\n"
-			"Default = 0";
-		case CID_LCDI2CAddr: return (char*)
-			"LCD I2C Address (LCDI2CAddr):\n"
-			"\n"
-			"Valid: 0x20-0x27 or 0x38-0x3F depending on module.\n"
-			"\n"
-			"Default = 0x3C";
-		case CID_LCDProto: return (char*)
-			"LCD Protocol (LCDProto):\n"
-			"\n"
-			"0 = HD44780 / X3LCD, 1 = US2066 (NHD-0420CW)\n"
-			"\n"
-			"Default = 0";
 		case CID_TUDATARedir: return (char*)
 			"TUDATA Redirect (TUDATARedir):\n"
 			"\n"
 			"Redirects UDATA/TDATA to alternate drive/partition.\n"
+			"The target HDD and partition are set in cerbios.ini\n"
+			"directly (TUDATARedirHDD / TUDATARedirPart). PrometheOS\n"
+			"does not edit those values via this menu.\n"
 			"\n"
 			"Default = False";
-		case CID_TUDATARedirHDD: return (char*)
-			"TUDATA Redir HDD (TUDATARedirHDD):\n"
-			"\n"
-			"0 = Master, 1 = Slave\n"
-			"\n"
-			"Default = Master";
-		case CID_TUDATARedirPart: return (char*)
-			"TUDATA Redir Part (TUDATARedirPart):\n"
-			"\n"
-			"1 = E:, 6 = F:, 7 = G:\n"
-			"\n"
-			"Default = E:";
 		case CID_EnableScreenshots: return (char*)
 			"Enable Screenshots (EnableScreenshots):\n"
 			"\n"
-			"Capture XBE framebuffer to E:\\Cerbios\\Screenshots\\(TitleID)\n"
-			"when L-Thumb + R-Thumb pressed.\n"
+			"Capture XBE framebuffer to <Part>:\\Cerbios\\Screenshots\\\n"
+			"(TitleID) when L-Thumb + R-Thumb pressed.\n"
+			"\n"
+			"When enabled, the Screenshot HDD and Partition rows\n"
+			"appear below to choose the target.\n"
 			"\n"
 			"Default = False";
 		case CID_ScreenshotHDD: return (char*)
 			"Screenshot HDD (ScreenshotHDD):\n"
 			"\n"
-			"0 = Master, 1 = Slave\n"
+			"0 = Master, 1 = Slave (Dual HDD setups only)\n"
 			"\n"
 			"Default = Master";
 		case CID_ScreenshotPart: return (char*)
 			"Screenshot Part (ScreenshotPart):\n"
 			"\n"
+			"Target partition for captured screenshots:\n"
 			"1 = E:, 6 = F:, 7 = G:\n"
 			"\n"
 			"Default = E:";
-		case CID_IGRMasterPort: return (char*)
-			"IGR Master Port (IGRMasterPort):\n"
-			"\n"
-			"Which controller can trigger IGR combos.\n"
-			"0 = ALL, 1-4 = Controller ports.\n"
-			"\n"
-			"Default = ALL";
-		case CID_IGRDash:
-		case CID_IGRGame:
-		case CID_IGRFull:
-		case CID_IGRCycle:
-		case CID_IGRShutdown:
-		case CID_IGRScreen: return (char*)
-			"IGR Combo (hex digits = button sequence):\n"
-			"\n"
-			"A=0 B=1 X=2 Y=3 BLACK=4 WHITE=5 LT=6 RT=7\n"
-			"DUP=8 DDN=9 DL=A DR=B START=C BACK=D LT-STK=E RT-STK=F\n"
-			"\n"
-			"Edit each hex digit with the on-screen picker.";
-		case CID_AdvUnlock: return (char*)
-			"Unlock Advanced (Overclock):\n"
-			"\n"
-			"Toggle to reveal Overclocking / CPUMPLLCoeff / NVPLLCoeff.\n"
-			"These directly expose CPU/GPU PLL hardware registers.\n"
-			"Incorrect values can cause instability or damage.\n"
-			"Team Cerbios is not responsible for misuse.";
-		case CID_Overclocking: return (char*)
-			"Overclocking (Overclocking):\n"
-			"\n"
-			"Master switch for the CPU/GPU overclock coefficients below.\n"
-			"\n"
-			"Default = False";
-		case CID_CPUMPLLCoeff: return (char*)
-			"CPU Overclock (CPUMPLLCoeff):\n"
-			"\n"
-			"3-byte hex value controlling CPU PLL. Stock = 0x230801.\n"
-			"Example: 0x232304 for ~802MHz on a stock 733MHz CPU.\n"
-			"Eject during boot enters safe mode with stock values.\n"
-			"\n"
-			"Default = 0x000000";
-		case CID_NVPLLCoeff: return (char*)
-			"GPU Overclock (NVPLLCoeff):\n"
-			"\n"
-			"3-byte hex value controlling GPU PLL. Stock = 0x011C01.\n"
-			"Example: 0x012001 for ~266MHz GPU.\n"
-			"\n"
-			"Default = 0x000000";
 	}
 	return (char*)"NO INFO AVAILABLE FOR THIS OPTION";
 }
