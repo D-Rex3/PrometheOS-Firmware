@@ -947,9 +947,9 @@ static void setConfigDefaultLegacy(cerbiosConfig* config)
 	config->DriveSetup = 1;
 	config->AVCheck = 1;
 	config->Debug = 0;
-	strcpy(config->CdPath1, "");
-	strcpy(config->CdPath2, "");
-	strcpy(config->CdPath3, "");
+	strcpy(config->CdPath1, "D:\\Evolutionx\\evoxdash.xbe");
+	strcpy(config->CdPath2, "D:\\Avalaunch\\avalaunch.xbe");
+	strcpy(config->CdPath3, "D:\\UnleashX\\unleashx.xbe");
 	strcpy(config->DashPath1, "C:\\evoxdash.xbe");
 	strcpy(config->DashPath2, "C:\\avalaunch.xbe");
 	strcpy(config->DashPath3, "C:\\nexgen.xbe");
