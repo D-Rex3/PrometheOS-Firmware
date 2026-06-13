@@ -365,7 +365,13 @@ void cerbiosIniHelper::parseConfig(cerbiosConfig* config, utils::dataContainer* 
     for (uint32_t i = 0; i < configData->size; i++)
     {
         char c = configData->data[i];
-        if (c == '\r' || c == '\n')
+        if (c == '\r')
+        {
+            // Treat only LF as end-of-line; CR is dropped so \r\n pairs (or bare
+            // \r in legacy files) don't double-count and produce blank doc lines.
+            continue;
+        }
+        if (c == '\n')
         {
             // End of line
             if (lineLength > 0 || outDoc != NULL)
@@ -930,12 +936,10 @@ static void setConfigDefaultLegacy(cerbiosConfig* config)
 	strcpy(config->CdPath1, "");
 	strcpy(config->CdPath2, "");
 	strcpy(config->CdPath3, "");
-	// Device-path form: works on Cerbios 2.0.0 through 2.4.2.
-	// Cerbios 2.4.2 also accepts drive-letter form (C:\...) but older versions need device paths.
-	strcpy(config->DashPath1, "\\Device\\Harddisk0\\Partition2\\evoxdash.xbe");
-	strcpy(config->DashPath2, "\\Device\\Harddisk0\\Partition2\\avalaunch.xbe");
-	strcpy(config->DashPath3, "\\Device\\Harddisk0\\Partition2\\nexgen.xbe");
-	strcpy(config->BootAnimPath, "\\Device\\Harddisk0\\Partition2\\BootAnims\\Xbox\\bootanim.xbe");
+	strcpy(config->DashPath1, "C:\\evoxdash.xbe");
+	strcpy(config->DashPath2, "C:\\avalaunch.xbe");
+	strcpy(config->DashPath3, "C:\\nexgen.xbe");
+	strcpy(config->BootAnimPath, "C:\\BootAnims\\Xbox\\bootanim.xbe");
 	strcpy(config->FrontLed, "GGGG");
 	config->FanSpeed = 0;
 	config->UdmaModeMaster = 2;
