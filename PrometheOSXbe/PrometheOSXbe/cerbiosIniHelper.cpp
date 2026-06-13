@@ -362,6 +362,7 @@ void cerbiosIniHelper::parseConfig(cerbiosConfig* config, utils::dataContainer* 
     char* value = (char*)malloc(256);
 
     uint32_t lineLength = 0;
+    bool prevWasBlank = false;  // collapse runs of consecutive blank lines to 1
     for (uint32_t i = 0; i < configData->size; i++)
     {
         char c = configData->data[i];
@@ -391,12 +392,25 @@ void cerbiosIniHelper::parseConfig(cerbiosConfig* config, utils::dataContainer* 
                     }
                 }
 
+                bool isBlank = (first == 0);
+
                 if (isCommentOrBlank)
                 {
-                    if (outDoc) docAppendRaw(outDoc, lineBuffer, lineLength);
+                    // Collapse runs of 2+ consecutive blank lines down to 1.
+                    // Cleans up files that grew bloat from earlier round-trip bugs.
+                    if (isBlank && prevWasBlank)
+                    {
+                        // Skip; already have one blank
+                    }
+                    else if (outDoc)
+                    {
+                        docAppendRaw(outDoc, lineBuffer, lineLength);
+                    }
+                    prevWasBlank = isBlank;
                 }
                 else
                 {
+                    prevWasBlank = false;
                     // Try key=value split
                     if (splitKeyValue(lineBuffer, lineLength, origKey, value))
                     {
