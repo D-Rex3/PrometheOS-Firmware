@@ -163,14 +163,24 @@ static char* charPtr(cerbiosConfig* cfg, size_t off) { return (char*)((char*)cfg
 // ============================================================================
 // filePickerScene returns raw kernel device paths like
 //   \Device\Harddisk0\Partition1\Apps\Dashloader\evoxdash.xbe
-// Cerbios INI expects drive-letter form:
-//   3.0.0+ : HDD0-E:\Apps\Dashloader\evoxdash.xbe   (HDD prefix for dual-HDD setups)
-//   2.4.2  : E:\Apps\Dashloader\evoxdash.xbe
-// Partition map (Xbox kernel): 1=E 2=C 3=X 4=Y 5=Z 6=F 7=G. Returns false if the
-// input doesn't match the device-path pattern so the original text is preserved.
+// For Cerbios 3.0.0+ we rewrite to HDD-prefixed drive-letter form
+// (HDD0-E:\Apps\Dashloader\evoxdash.xbe) since that's the canonical format
+// in cerbios3.0.0.ini.
+//
+// For the legacy editor (Cerbios 2.0.0-2.4.2) we deliberately leave the
+// device-path form alone: Cerbios 2.4.x accepts drive letters too, but older
+// 2.x versions need device paths and we want one editor to cover all of them.
+//
+// Partition map (Xbox kernel): 1=E 2=C 3=X 4=Y 5=Z 6=F 7=G. Returns false if
+// the input doesn't match the device-path pattern so the original text is
+// preserved.
 
 static bool convertDevicePathToDrive(const char* devPath, cerbiosVersion version, char* outBuf)
 {
+	// Legacy leaf supports Cerbios 2.0.0-2.4.2 in one place; device-path form
+	// is the lowest common denominator. Skip conversion entirely.
+	if (version != CerbiosVersionCurrent) return false;
+
 	const char* devicePrefix = "\\Device\\Harddisk";
 	size_t prefixLen = strlen(devicePrefix);
 	if (strncmp(devPath, devicePrefix, prefixLen) != 0) return false;
