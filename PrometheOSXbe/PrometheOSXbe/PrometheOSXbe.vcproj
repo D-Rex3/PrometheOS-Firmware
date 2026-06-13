@@ -1757,9 +1757,6 @@
 					RelativePath=".\Scenes\frontLedSelectorScene.cpp">
 				</File>
 				<File
-					RelativePath=".\Scenes\hexSelectorScene.cpp">
-				</File>
-				<File
 					RelativePath=".\Scenes\hddLockUnlockScene.cpp">
 				</File>
 				<File
@@ -2384,9 +2381,6 @@
 				</File>
 				<File
 					RelativePath=".\Scenes\frontLedSelectorScene.h">
-				</File>
-				<File
-					RelativePath=".\Scenes\hexSelectorScene.h">
 				</File>
 				<File
 					RelativePath=".\Scenes\hddLockUnlockScene.h">
